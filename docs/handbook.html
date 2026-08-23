@@ -331,7 +331,7 @@
   <h1>Public Instagram media,<br><span class="dim">at full quality, on your disk.</span></h1>
   <p class="lede">A local, single-user tool. Look up a public profile, browse its posts and Reels in a grid, select what you want, and get the originals written into a folder on your machine — no transcode, no ZIP, no browser download prompts.</p>
   <div class="facts">
-    <span class="hot">125 backend tests</span>
+    <span class="hot">127 backend tests</span>
     <span class="hot">15 e2e tests</span>
     <span>1 worker thread</span>
     <span>2 containers</span>
@@ -594,10 +594,10 @@ docker compose up -d</code></pre>
 
 <section id="testing">
   <div class="kicker">09 · Testing</div>
-  <h2>140 tests, one of them allowed near the network</h2>
-  <pre><code>cd api &amp;&amp; python -m pytest        # 125 backend, no network
+  <h2>142 tests, one of them allowed near the network</h2>
+  <pre><code>cd api &amp;&amp; python -m pytest        # 127 backend, no network
 bash scripts/e2e-native.sh        # 15 browser tests, no Docker
-bash scripts/e2e.sh               # same suite via Compose
+bash scripts/e2e.sh               # same suite via Compose (verified)
 cd api &amp;&amp; python -m pytest -m live   # opt-in, hits Instagram</code></pre>
 
   <p>The adapter boundary is what makes this testable: four call sites, plain dataclasses, and an in-memory fake underneath. Everything above it runs with zero network access.</p>
@@ -609,14 +609,14 @@ cd api &amp;&amp; python -m pytest -m live   # opt-in, hits Instagram</code></pr
   <p>VCR-style recordings of Instaloader traffic would bake in session cookies and signed CDN URLs, and would keep passing green for weeks after the real API changed — precisely the failure they would exist to catch. Parser tests use checked-in sample payloads; the live canary covers the rest.</p>
 
   <div class="callout">
-    <strong>A green unit suite is not proof the thing runs.</strong> Two bugs shipped past 120 passing tests and only appeared under a real server: FastAPI resolves a sync dependency and runs the sync endpoint on <em>different</em> threadpool threads, so a thread-local SQLite connection was used off-thread and every request 500'd; and the fake adapter the server built was empty, so a seeded database referenced posts it had never heard of. <code>TestClient</code> runs everything on one thread and could not see either. Both now have regression tests.
+    <strong>A green unit suite is not proof the thing runs.</strong> Three bugs shipped past a green unit suite and only appeared under a real server: FastAPI resolves a sync dependency and runs the sync endpoint on <em>different</em> threadpool threads, so a thread-local SQLite connection was used off-thread and every request 500'd; the fake adapter the server built was empty, so a seeded database referenced posts it had never heard of; and the boot log advertised JSON while emitting a Python dict repr. <code>TestClient</code> runs on one thread and never reads the logs, so it could see none of them. All three now have regression tests.
   </div>
 </section>
 
 <section id="roadmap">
   <div class="kicker">10 · Roadmap</div>
   <h2>Where it stands</h2>
-  <p>v1 was built in one pass as 23 TDD tasks across four phases. Everything below <code>P4</code> is verified by a green suite; the two <code>NEXT</code> items are gaps in <em>verification</em>, not in code.</p>
+  <p>v1 was built in one pass as 23 TDD tasks across four phases. Everything through <code>P5</code> is verified by a green suite. <code>P6</code> is the last gap in <em>verification</em> rather than in code — and the only one that cannot be closed without real credentials.</p>
 
   <div class="scroll">
   <table>
@@ -625,7 +625,7 @@ cd api &amp;&amp; python -m pytest -m live   # opt-in, hits Instagram</code></pr
     <tr><td class="num">P2</td><td>Three job handlers, real Instaloader adapter with error classification, paced rate controller, interactive login entrypoint</td><td><span class="pill done">SHIPPED</span></td></tr>
     <tr><td class="num">P3</td><td>App factory and lifespan, all sixteen routes, request-scoped connections, download service, health canary</td><td><span class="pill done">SHIPPED</span></td></tr>
     <tr><td class="num">P4</td><td>Next.js scaffold, typed API client, breaker banner, grid with shift-click ranges, selection bar and download flow, activity screen, 15 Playwright tests, e2e runner scripts</td><td><span class="pill done">SHIPPED</span></td></tr>
-    <tr><td class="num">P5</td><td>Compose boot verified end to end — <code>docker compose build</code>, <code>up</code>, and <code>scripts/e2e.sh</code>. Files are written; the daemon was unavailable when v1 landed, so the native runner stood in</td><td><span class="pill block">BLOCKED</span></td></tr>
+    <tr><td class="num">P5</td><td>Compose verified end to end — both images build, <code>scripts/e2e.sh</code> runs 15/15 green in containers, the production stack boots with the worker alive, port 8000 stays unpublished, the login entrypoint runs, and a single <code>--workers 1</code> process was confirmed inside the container</td><td><span class="pill done">SHIPPED</span></td></tr>
     <tr><td class="num">P6</td><td>Live canary against real Instagram with credentials in <code>.env</code> — the first true check that <code>post_to_igpost</code> and <code>classify</code> match today's API</td><td><span class="pill next">NEXT</span></td></tr>
     <tr><td class="num">P7</td><td>Retry affordance for failed items in the selection bar; per-item error text surfaced on the tile rather than only in the log</td><td><span class="pill later">LATER</span></td></tr>
     <tr><td class="num">P8</td><td>Video thumbnails as poster frames; inline preview on tile click, separate from selection</td><td><span class="pill later">LATER</span></td></tr>
@@ -636,8 +636,7 @@ cd api &amp;&amp; python -m pytest -m live   # opt-in, hits Instagram</code></pr
 
   <h3>Known gaps, stated plainly</h3>
   <ul class="tight">
-    <li><strong>The Docker path is unverified.</strong> Dockerfiles and both Compose files are written but have never been built or booted. The native runner (<code>scripts/e2e-native.sh</code>) is the path proven green.</li>
-    <li><strong>The live canary has never run.</strong> It needs real credentials. Until it does, the adapter's agreement with today's Instagram is asserted only against checked-in fixtures.</li>
+    <li><strong>The live canary has never run.</strong> It needs real credentials. Until it does, the adapter's agreement with today's Instagram is asserted only against checked-in fixtures — the one claim in this handbook with no evidence behind it.</li>
     <li><strong>The download flow depends on the tab staying open.</strong> Accepted tradeoff, documented above.</li>
     <li><strong>Failed items need a manual retry</strong> via <code>ensure</code> with <code>retry: true</code>. The API supports it; the UI exposes it only through the error state's Retry button.</li>
   </ul>
