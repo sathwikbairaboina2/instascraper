@@ -331,8 +331,8 @@
   <h1>Public Instagram media,<br><span class="dim">at full quality, on your disk.</span></h1>
   <p class="lede">A local, single-user tool. Look up a public profile, browse its posts and Reels in a grid, select what you want, and get the originals written into a folder on your machine — no transcode, no ZIP, no browser download prompts.</p>
   <div class="facts">
-    <span class="hot">132 backend tests</span>
-    <span class="hot">20 e2e tests</span>
+    <span class="hot">136 backend tests</span>
+    <span class="hot">34 e2e tests</span>
     <span>1 worker thread</span>
     <span>2 containers</span>
     <span>5 tables</span>
@@ -362,6 +362,14 @@
     <div class="card">
       <h4>Cache forever</h4>
       <p>Fetched media stays on disk. Re-selecting something you already pulled completes in under a second and queues nothing.</p>
+    </div>
+    <div class="card">
+      <h4>Look before you pull</h4>
+      <p>A per-tile control opens a lightbox: video plays inline, carousels step with arrow keys, and an uncached item shows its thumbnail and offers to fetch.</p>
+    </div>
+    <div class="card">
+      <h4>Find things again</h4>
+      <p>Filter by kind, cached-only, or caption text, and save a named selection per profile for pulls you repeat.</p>
     </div>
   </div>
 </section>
@@ -563,7 +571,7 @@ docker compose up -d</code></pre>
     <tr><td class="num">DELETE</td><td class="num">/profiles/{u}/cache</td><td>Remove cached files, keep the rows.</td></tr>
     <tr><td class="num">GET</td><td class="num">/media/{sc}/thumb</td><td>Thumbnail.</td></tr>
     <tr><td class="num">GET</td><td class="num">/media/{sc}/full</td><td>Full media. 404 unless <code>ready</code>. <code>?child=N</code> for carousels.</td></tr>
-    <tr><td class="num">POST</td><td class="num">/media/ensure</td><td>Status map; enqueues what is missing. The progress feed.</td></tr>
+    <tr><td class="num">POST</td><td class="num">/media/ensure</td><td>Status map plus an errors map; enqueues what is missing. The progress feed.</td></tr>
     <tr><td class="num">POST</td><td class="num">/downloads</td><td>Copy to the output folder. 409 lists anything not ready.</td></tr>
     <tr><td class="num">GET</td><td class="num">/activity</td><td>Reverse-chronological log.</td></tr>
     <tr><td class="num">GET</td><td class="num">/health/canary</td><td>Live shape check against Instagram. Reports, never raises.</td></tr>
@@ -594,9 +602,9 @@ docker compose up -d</code></pre>
 
 <section id="testing">
   <div class="kicker">09 · Testing</div>
-  <h2>152 tests, one of them allowed near the network</h2>
-  <pre><code>cd api &amp;&amp; python -m pytest        # 132 backend, no network
-bash scripts/e2e-native.sh        # 20 browser tests, no Docker
+  <h2>170 tests, one of them allowed near the network</h2>
+  <pre><code>cd api &amp;&amp; python -m pytest        # 136 backend, no network
+bash scripts/e2e-native.sh        # 34 browser tests, no Docker
 bash scripts/e2e.sh               # same suite via Compose (verified)
 cd api &amp;&amp; python -m pytest -m live   # opt-in, hits Instagram</code></pre>
 
@@ -616,7 +624,7 @@ cd api &amp;&amp; python -m pytest -m live   # opt-in, hits Instagram</code></pr
 <section id="roadmap">
   <div class="kicker">10 · Roadmap</div>
   <h2>Where it stands</h2>
-  <p>v1 was built in one pass as 23 TDD tasks across four phases. <code>P1</code>–<code>P5</code> and <code>P7</code> are verified by a green suite. <code>P6</code> is the last gap in <em>verification</em> rather than in code — and the only one that cannot be closed without real credentials.</p>
+  <p>v1 was built in one pass as 23 TDD tasks across four phases; <code>P7</code>–<code>P10</code> followed. Every phase except <code>P6</code> is verified by a green suite, natively and in containers. <code>P6</code> is the last gap in <em>verification</em> rather than in code — and the only one that cannot be closed without real credentials.</p>
 
   <div class="scroll">
   <table>
@@ -628,9 +636,9 @@ cd api &amp;&amp; python -m pytest -m live   # opt-in, hits Instagram</code></pr
     <tr><td class="num">P5</td><td>Compose verified end to end — both images build, <code>scripts/e2e.sh</code> runs 15/15 green in containers, the production stack boots with the worker alive, port 8000 stays unpublished, the login entrypoint runs, and a single <code>--workers 1</code> process was confirmed inside the container</td><td><span class="pill done">SHIPPED</span></td></tr>
     <tr><td class="num">P6</td><td>Live canary against real Instagram with credentials in <code>.env</code> — the first true check that <code>post_to_igpost</code> and <code>classify</code> match today's API</td><td><span class="pill next">NEXT</span></td></tr>
     <tr><td class="num">P7</td><td>Per-item error text on the tile with its own Retry control; the selection bar now names the failing shortcodes and their reasons instead of "some items failed". <code>full_error</code> exposed through the media list and <code>ensure</code></td><td><span class="pill done">SHIPPED</span></td></tr>
-    <tr><td class="num">P8</td><td>Video thumbnails as poster frames; inline preview on tile click, separate from selection</td><td><span class="pill later">LATER</span></td></tr>
-    <tr><td class="num">P9</td><td>Grid filters — kind, date range, cached-only — and a saved-selection concept for recurring pulls</td><td><span class="pill later">LATER</span></td></tr>
-    <tr><td class="num">P10</td><td>Instaloader version-bump drill: canary-driven upgrade path with the adapter's contract tests as the gate</td><td><span class="pill later">LATER</span></td></tr>
+    <tr><td class="num">P8</td><td>Lightbox preview reachable from a per-tile control, separate from selection: video plays inline, carousels step with buttons or arrow keys, an uncached item shows its thumbnail and offers to fetch</td><td><span class="pill done">SHIPPED</span></td></tr>
+    <tr><td class="num">P9</td><td>Fixed the grid window, which requested a fixed 120 while "Load more" kept indexing — everything past the newest 120 was invisible. Then filters by kind, cached-only and caption text, plus named selections stored per profile in <code>localStorage</code></td><td><span class="pill done">SHIPPED</span></td></tr>
+    <tr><td class="num">P10</td><td><code>scripts/bump-instaloader.sh</code> — contract tests, bump, reinstall, contract tests, canary; restores the old pin on failure and refuses to report a bump verified when the canary cannot run. Exercised against a real 4.14.1 → 4.15.3 bump</td><td><span class="pill done">SHIPPED</span></td></tr>
   </table>
   </div>
 
