@@ -1,12 +1,46 @@
 'use client'
 
+import {
+  AppstoreOutlined,
+  BorderOuterOutlined,
+  ClearOutlined,
+  CloudDownloadOutlined,
+  ExpandOutlined,
+  LinkOutlined,
+  ReloadOutlined,
+  SearchOutlined,
+  StarFilled,
+  StarOutlined,
+} from '@ant-design/icons'
+import {
+  Alert,
+  Avatar,
+  Button,
+  Checkbox,
+  Descriptions,
+  Divider,
+  Empty,
+  Flex,
+  Input,
+  Layout,
+  Progress,
+  Segmented,
+  Skeleton,
+  Space,
+  Tag,
+  Tooltip,
+  Typography,
+  theme,
+} from 'antd'
 import { use, useCallback, useEffect, useMemo, useState } from 'react'
 
+import AppShell from '@/components/AppShell'
 import Lightbox from '@/components/Lightbox'
-import MediaGrid from '@/components/MediaGrid'
+import MediaTile from '@/components/MediaTile'
 import SelectionBar from '@/components/SelectionBar'
 import {
   clearCache,
+  createDownload,
   ensureMedia,
   getMedia,
   getProfile,
@@ -14,63 +48,62 @@ import {
   setTracked,
   type MediaSummary,
 } from '@/lib/api'
-import { useFilters } from '@/lib/useFilters'
-import { usePolling } from '@/lib/usePolling'
 import {
   deleteSelection,
   loadSelections,
   saveSelection,
   type SavedSelection,
 } from '@/lib/savedSelections'
+import { applyFilters, EMPTY_FILTERS, type Filters, type KindFilter } from '@/lib/useFilters'
+import { usePolling } from '@/lib/usePolling'
 import { useSelection } from '@/lib/useSelection'
+
+const { Content, Sider } = Layout
+const { Text, Paragraph } = Typography
 
 const PAGE = 120
 
 export default function ProfilePage({ params }: { params: Promise<{ username: string }> }) {
   const { username } = use(params)
-  const [busy, setBusy] = useState(false)
-  // The window grows to cover everything indexed. A fixed limit silently hid
-  // every post past the first 120, however many times you pressed Load more.
-  const [windowSize, setWindowSize] = useState(PAGE)
+  const { token } = theme.useToken()
 
-  const {
-    data: profile,
-    error,
-    refresh: refreshProfile,
-  } = usePolling(() => getProfile(username), 4000)
+  const [busy, setBusy] = useState(false)
+  const [windowSize, setWindowSize] = useState(PAGE)
+  const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS)
+  const [density, setDensity] = useState('Comfortable')
+  const [preview, setPreview] = useState<MediaSummary | null>(null)
+  const [base, setBase] = useState('')
+  const [saved, setSaved] = useState<SavedSelection[]>([])
+  const [saveName, setSaveName] = useState('')
+
+  const { data: profile, error, refresh: refreshProfile } = usePolling(
+    () => getProfile(username),
+    10000,
+  )
   const { data: media, refresh: refreshMedia } = usePolling(
     () => getMedia(username, windowSize, 0),
     4000,
   )
 
+  useEffect(() => setSaved(loadSelections(username)), [username])
+
   const total = media?.total ?? 0
   useEffect(() => {
     if (total > windowSize) setWindowSize(total)
   }, [total, windowSize])
-
   useEffect(() => {
     refreshMedia()
   }, [windowSize, refreshMedia])
 
   const items = useMemo(() => media?.items ?? [], [media])
-  const filters = useFilters(items)
-  // Selection follows what is actually on screen, so "Select all loaded" and
-  // shift-click ranges mean the visible grid, not the hidden remainder.
-  const ids = useMemo(() => filters.visible.map((i) => i.shortcode), [filters.visible])
+  const visible = useMemo(() => applyFilters(items, filters), [items, filters])
+  const ids = useMemo(() => visible.map((i) => i.shortcode), [visible])
   const selection = useSelection(ids)
 
-  const [preview, setPreview] = useState<MediaSummary | null>(null)
-  const [saved, setSaved] = useState<SavedSelection[]>([])
-  const [saveName, setSaveName] = useState('')
-
-  useEffect(() => setSaved(loadSelections(username)), [username])
-
-  // Keep the open lightbox in step with polling, so "Fetch full quality"
-  // swaps the placeholder for the real media without reopening.
-  const previewLive = useMemo(
-    () => (preview ? items.find((i) => i.shortcode === preview.shortcode) ?? preview : null),
-    [preview, items],
-  )
+  const set = <K extends keyof Filters>(key: K, value: Filters[K]) =>
+    setFilters((prev) => ({ ...prev, [key]: value }))
+  const filtersActive =
+    filters.kind !== 'all' || filters.cachedOnly || filters.query.trim() !== ''
 
   const onRetry = useCallback(
     async (shortcode: string) => {
@@ -90,49 +123,97 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
     }
   }, [username, refreshMedia])
 
+  const previewLive = useMemo(
+    () => (preview ? items.find((i) => i.shortcode === preview.shortcode) ?? preview : null),
+    [preview, items],
+  )
+
+  const selectedItems = useMemo(
+    () => selection.selected.map((c) => items.find((i) => i.shortcode === c)).filter(Boolean) as MediaSummary[],
+    [selection.selected, items],
+  )
+  const one = selectedItems.length === 1 ? selectedItems[0] : undefined
+  const readyCount = selectedItems.filter((i) => i.full_status === 'ready').length
+  const fileCount = selectedItems.reduce((n, i) => n + (i.child_count || 1), 0)
+  const pending = selectedItems.length - readyCount
+
+  const tile = density === 'Compact' ? 112 : 158
+
   if (error) {
     return (
-      <p role="alert" data-testid="profile-error">
-        {error}
-      </p>
+      <AppShell active={username}>
+        <Content style={{ padding: 32 }}>
+          <Alert type="error" showIcon title="Cannot load this profile" description={error} data-testid="profile-error" />
+        </Content>
+      </AppShell>
     )
   }
-  if (!profile) return <p className="muted">Loading…</p>
-  if (profile.is_private) {
+
+  if (profile?.is_private) {
     return (
-      <p role="alert" data-testid="profile-private">
-        {username} is private. This tool only supports public profiles.
-      </p>
+      <AppShell active={username}>
+        <Content style={{ padding: 32 }}>
+          <Alert
+            type="warning"
+            showIcon
+            data-testid="profile-private"
+            title={`${username} is private`}
+            description="This tool only supports public profiles."
+          />
+        </Content>
+      </AppShell>
     )
   }
 
   return (
-    <div style={{ display: 'grid', gap: '1rem' }}>
-      <header style={{ display: 'flex', gap: '1rem', alignItems: 'center', border: 0 }}>
-        <img
-          src={profile.avatar_url}
-          alt=""
-          width={64}
-          height={64}
-          style={{ borderRadius: '50%' }}
-        />
-        <div style={{ flex: 1 }}>
-          <h1 style={{ margin: 0 }}>{profile.username}</h1>
-          <p className="muted" style={{ margin: 0 }}>
-            {profile.post_count ?? 0} posts · {items.length} loaded · {profile.cached_count} cached
-          </p>
-        </div>
-        <button
+    <AppShell active={username}>
+      <Flex
+        align="center"
+        gap={12}
+        style={{
+          height: 56,
+          padding: '0 16px',
+          flex: 'none',
+          background: token.colorBgContainer,
+          borderBottom: `1px solid ${token.colorBorderSecondary}`,
+        }}
+      >
+        <Avatar size={32} src={profile?.avatar_url} />
+        <Text strong style={{ fontSize: 18, letterSpacing: '-0.02em' }}>{username}</Text>
+        <Tag variant="filled" style={{ background: token.colorFillSecondary }}>
+          {profile?.post_count ?? 0} posts
+        </Tag>
+        <Tag variant="filled" color={token.colorPrimary}>
+          <span style={{ fontWeight: 600 }}>{profile?.cached_count ?? 0} cached</span>
+        </Tag>
+        <div style={{ flex: 1 }} />
+        <Button
+          type="text"
           data-testid="track-toggle"
+          icon={profile?.tracked ? <StarFilled /> : <StarOutlined />}
+          style={{ color: profile?.tracked ? token.colorWarning : undefined }}
           onClick={async () => {
-            await setTracked(username, !profile.tracked)
+            await setTracked(username, !profile?.tracked)
             refreshProfile()
           }}
         >
-          {profile.tracked ? 'Untrack' : 'Track'}
-        </button>
-        <button
+          {profile?.tracked ? 'Tracked' : 'Track'}
+        </Button>
+        <Tooltip title="Refresh now">
+          <Button
+            shape="circle"
+            data-testid="refresh"
+            icon={<ReloadOutlined />}
+            onClick={() => {
+              refreshProfile()
+              refreshMedia()
+            }}
+          />
+        </Tooltip>
+        <Button
+          type="text"
           data-testid="clear-cache"
+          icon={<ClearOutlined />}
           onClick={async () => {
             await clearCache(username)
             selection.clear()
@@ -141,107 +222,257 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
           }}
         >
           Clear cache
-        </button>
-      </header>
+        </Button>
+      </Flex>
 
-      <div className="filters" data-testid="filters">
-        <select
+      <Flex
+        align="center"
+        gap={10}
+        wrap
+        style={{
+          padding: '10px 16px',
+          flex: 'none',
+          background: token.colorBgLayout,
+          borderBottom: `1px solid ${token.colorBorderSecondary}`,
+        }}
+      >
+        <Segmented
+          size="small"
           data-testid="filter-kind"
-          aria-label="Filter by kind"
-          value={filters.filters.kind}
-          onChange={(e) => filters.set('kind', e.target.value as typeof filters.filters.kind)}
-        >
-          <option value="all">All kinds</option>
-          <option value="image">Photos</option>
-          <option value="video">Video &amp; Reels</option>
-          <option value="carousel">Carousels</option>
-        </select>
-
-        <label className="check">
-          <input
-            type="checkbox"
-            data-testid="filter-cached"
-            checked={filters.filters.cachedOnly}
-            onChange={(e) => filters.set('cachedOnly', e.target.checked)}
-          />
-          Cached only
-        </label>
-
-        <input
+          value={filters.kind}
+          onChange={(v) => set('kind', v as KindFilter)}
+          options={[
+            { value: 'all', label: 'All' },
+            { value: 'image', label: 'Photos' },
+            { value: 'video', label: 'Video' },
+            { value: 'carousel', label: 'Carousels' },
+          ]}
+        />
+        <Input
+          size="small"
           data-testid="filter-query"
-          placeholder="search captions"
-          value={filters.filters.query}
-          onChange={(e) => filters.set('query', e.target.value)}
+          placeholder="Search captions"
+          value={filters.query}
+          onChange={(e) => set('query', e.target.value)}
+          prefix={<SearchOutlined style={{ color: token.colorTextQuaternary }} />}
+          style={{ width: 200 }}
+          allowClear
         />
-
-        <span className="muted" data-testid="filter-count">
-          {filters.visible.length} of {items.length} shown
-        </span>
-
-        {filters.active && (
-          <button data-testid="filter-reset" onClick={filters.reset}>
+        <Checkbox
+          data-testid="filter-cached"
+          checked={filters.cachedOnly}
+          onChange={(e) => set('cachedOnly', e.target.checked)}
+        >
+          Cached only
+        </Checkbox>
+        <div style={{ flex: 1 }} />
+        <Text type="secondary" style={{ fontSize: 12 }} data-testid="filter-count">
+          {visible.length} of {items.length} shown
+        </Text>
+        {filtersActive && (
+          <Button size="small" data-testid="filter-reset" onClick={() => setFilters(EMPTY_FILTERS)}>
             Reset
-          </button>
+          </Button>
         )}
-
-        <button
-          data-testid="select-all"
-          disabled={filters.visible.length === 0}
-          onClick={selection.selectAll}
-        >
-          Select all shown
-        </button>
-      </div>
-
-      <div className="filters" data-testid="saved-selections">
-        <input
-          data-testid="save-name"
-          placeholder="name this selection"
-          value={saveName}
-          onChange={(e) => setSaveName(e.target.value)}
+        <Segmented
+          size="small"
+          value={density}
+          onChange={(v) => setDensity(v as string)}
+          options={[
+            { value: 'Comfortable', icon: <BorderOuterOutlined /> },
+            { value: 'Compact', icon: <AppstoreOutlined /> },
+          ]}
         />
-        <button
-          data-testid="save-selection"
-          disabled={!saveName.trim() || selection.selected.length === 0}
-          onClick={() => {
-            setSaved(saveSelection(username, saveName, selection.selected))
-            setSaveName('')
-          }}
-        >
-          Save selection
-        </button>
-        {saved.map((s) => (
-          <span key={s.name} className="saved-chip">
-            <button
-              data-testid={`load-selection-${s.name}`}
-              onClick={() => {
-                selection.clear()
-                s.shortcodes.forEach((sc) => selection.toggle(sc))
+        <Button size="small" data-testid="select-all" disabled={visible.length === 0} onClick={selection.selectAll}>
+          Select all shown
+        </Button>
+        <Button size="small" data-testid="load-more" disabled={media?.exhausted || busy} loading={busy} onClick={onLoadMore}>
+          {media?.exhausted ? 'All loaded' : 'Load more'}
+        </Button>
+      </Flex>
+
+      <Layout style={{ overflow: 'hidden', flex: 1, minHeight: 0 }}>
+        <Content style={{ overflowY: 'auto', padding: 16, background: token.colorBgLayout }}>
+          {!media ? (
+            <div style={{ display: 'grid', gap: 10, gridTemplateColumns: `repeat(auto-fill, minmax(${tile}px, 1fr))` }}>
+              {Array.from({ length: 12 }).map((_, i) => (
+                <Skeleton.Node key={i} active style={{ width: '100%', height: tile }}>
+                  <span />
+                </Skeleton.Node>
+              ))}
+            </div>
+          ) : visible.length === 0 ? (
+            <Empty description="No posts match these filters" style={{ marginTop: 90 }}>
+              {filtersActive && (
+                <Button size="small" onClick={() => setFilters(EMPTY_FILTERS)}>Reset filters</Button>
+              )}
+            </Empty>
+          ) : (
+            <div
+              data-testid="media-grid"
+              style={{
+                display: 'grid',
+                gap: 10,
+                gridTemplateColumns: `repeat(auto-fill, minmax(${tile}px, 1fr))`,
+                gridAutoRows: `${tile}px`,
               }}
             >
-              {s.name} ({s.shortcodes.length})
-            </button>
-            <button
-              aria-label={`Delete ${s.name}`}
-              data-testid={`delete-selection-${s.name}`}
-              onClick={() => setSaved(deleteSelection(username, s.name))}
-            >
-              ×
-            </button>
-          </span>
-        ))}
-      </div>
+              {visible.map((item, idx) => (
+                <div key={item.shortcode} style={idx === 0 ? { gridColumn: 'span 2', gridRow: 'span 2' } : undefined}>
+                  <MediaTile
+                    item={item}
+                    selected={selection.isSelected(item.shortcode)}
+                    onToggle={(shift) => selection.toggle(item.shortcode, shift)}
+                    onRetry={() => onRetry(item.shortcode)}
+                    onPreview={() => setPreview(item)}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+        </Content>
 
-      <MediaGrid
-        items={filters.visible}
-        isSelected={selection.isSelected}
-        onToggle={selection.toggle}
-        onRetry={onRetry}
-        onPreview={setPreview}
-        exhausted={media?.exhausted ?? false}
-        loading={busy}
-        onLoadMore={onLoadMore}
-      />
+        <Sider
+          width={300}
+          style={{
+            background: token.colorBgContainer,
+            borderLeft: `1px solid ${token.colorBorderSecondary}`,
+            overflowY: 'auto',
+          }}
+        >
+          {selectedItems.length === 0 && (
+            <Flex vertical align="center" justify="center" gap={10} style={{ padding: 28, height: '100%' }}>
+              <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Nothing selected" />
+              <Text type="secondary" style={{ fontSize: 12, textAlign: 'center' }}>
+                Click a tile to inspect it. Shift click to take a range.
+              </Text>
+            </Flex>
+          )}
+
+          {one && (
+            <div style={{ padding: 16 }}>
+              <img
+                src={one.full_status === 'ready' ? `/api/media/${one.shortcode}/full?child=${one.child_count > 1 ? 1 : 0}` : one.thumb_url}
+                alt=""
+                style={{ width: '100%', borderRadius: token.borderRadiusLG, display: 'block' }}
+              />
+              <Paragraph style={{ margin: '14px 0 12px', fontSize: 13 }} ellipsis={{ rows: 3 }}>
+                {one.caption || 'No caption'}
+              </Paragraph>
+              <Descriptions
+                size="small"
+                column={1}
+                colon={false}
+                labelStyle={{ fontSize: 11, color: token.colorTextTertiary, width: 78 }}
+                contentStyle={{ fontSize: 12 }}
+                items={[
+                  { key: 'c', label: 'Shortcode', children: <Text code copyable style={{ fontSize: 11 }}>{one.shortcode}</Text> },
+                  { key: 'k', label: 'Kind', children: one.child_count > 1 ? `carousel, ${one.child_count} slides` : one.kind },
+                  { key: 't', label: 'Posted', children: one.taken_at.slice(0, 10) },
+                  {
+                    key: 's',
+                    label: 'Cached',
+                    children:
+                      one.full_status === 'ready' ? <Text type="success">yes</Text>
+                      : one.full_status === 'failed' ? <Text type="danger">{one.full_error}</Text>
+                      : <Text type="secondary">{one.full_status === 'none' ? 'not yet' : one.full_status}</Text>,
+                  },
+                ]}
+              />
+              <Space style={{ marginTop: 16 }} size={8}>
+                <Button icon={<ExpandOutlined />} onClick={() => setPreview(one)}>Preview</Button>
+                <Button icon={<LinkOutlined />} href={one.ig_url} target="_blank">Instagram</Button>
+              </Space>
+            </div>
+          )}
+
+          {selectedItems.length >= 1 && (
+            <div style={{ padding: 16, borderTop: one ? `1px solid ${token.colorBorderSecondary}` : undefined }}>
+              <Text
+                data-testid="selection-count"
+                style={{ display: 'block', fontSize: 34, fontWeight: 700, letterSpacing: '-0.035em', lineHeight: 1.05 }}
+              >
+                {selectedItems.length} selected
+              </Text>
+              <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 4 }}>
+                {fileCount} files · {readyCount} already cached
+              </Text>
+
+              <Divider style={{ margin: '16px 0' }} />
+
+              <SelectionBar
+                shortcodes={selection.selected}
+                base={base}
+                onBase={setBase}
+                fileCount={fileCount}
+                onClear={selection.clear}
+                onDone={refreshMedia}
+              />
+
+              {pending > 0 && (
+                <>
+                  <Divider style={{ margin: '16px 0' }} />
+                  <Alert
+                    type="info"
+                    showIcon
+                    title={`${pending} still to fetch`}
+                    description="Uncached posts are queued one at a time, paced to stay under Instagram's limits."
+                  />
+                </>
+              )}
+
+            </div>
+          )}
+
+          {(saved.length > 0 || selectedItems.length > 0) && (
+            <div style={{ padding: 16, borderTop: `1px solid ${token.colorBorderSecondary}` }}>
+              <Divider style={{ margin: '16px 0' }} />
+            <Text style={{ fontSize: 12, display: 'block', marginBottom: 7 }}>Save this selection</Text>
+            <Space.Compact style={{ width: '100%' }}>
+              <Input
+                data-testid="save-name"
+                placeholder="name it"
+                value={saveName}
+                onChange={(e) => setSaveName(e.target.value)}
+              />
+              <Button
+                data-testid="save-selection"
+                disabled={!saveName.trim()}
+                onClick={() => {
+                  setSaved(saveSelection(username, saveName, selection.selected))
+                  setSaveName('')
+                }}
+              >
+                Save
+              </Button>
+            </Space.Compact>
+            {saved.length > 0 && (
+              <Flex wrap gap={6} style={{ marginTop: 10 }}>
+                {saved.map((sel) => (
+                  <Tag
+                    key={sel.name}
+                    closable
+                    data-testid={`load-selection-${sel.name}`}
+                    onClose={(e) => {
+                      e.preventDefault()
+                      setSaved(deleteSelection(username, sel.name))
+                    }}
+                    closeIcon={<span data-testid={`delete-selection-${sel.name}`}>x</span>}
+                    onClick={() => {
+                      selection.clear()
+                      sel.shortcodes.forEach((sc) => selection.toggle(sc))
+                    }}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    {sel.name} ({sel.shortcodes.length})
+                  </Tag>
+                ))}
+              </Flex>
+            )}
+            </div>
+          )}
+        </Sider>
+      </Layout>
 
       {previewLive && (
         <Lightbox
@@ -253,12 +484,6 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
           }}
         />
       )}
-
-      <SelectionBar
-        shortcodes={selection.selected}
-        onClear={selection.clear}
-        onDone={refreshMedia}
-      />
-    </div>
+    </AppShell>
   )
 }

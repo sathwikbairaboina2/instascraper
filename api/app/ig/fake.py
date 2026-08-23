@@ -1,9 +1,45 @@
+import struct
 import time
+import zlib
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from app import paths
 from app.ig import types as t
+
+
+def _png(width: int, height: int, rgb: tuple[int, int, int]) -> bytes:
+    """A real, solid-colour PNG.
+
+    The fake used to write plain text into .jpg files, which is fine for
+    assertions and useless in a browser -- every tile rendered as a broken
+    image. Emitting decodable bytes costs a few lines and makes a
+    fake-adapter stack actually demonstrable.
+    """
+    row = b"\x00" + bytes(rgb) * width
+    raw = row * height
+
+    def chunk(tag: bytes, data: bytes) -> bytes:
+        body = tag + data
+        return struct.pack(">I", len(data)) + body + struct.pack(">I", zlib.crc32(body))
+
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0))
+        + chunk(b"IDAT", zlib.compress(raw, 9))
+        + chunk(b"IEND", b"")
+    )
+
+
+def _colour(seed: str) -> tuple[int, int, int]:
+    """Stable, distinct-ish colour per shortcode so tiles differ visibly."""
+    h = zlib.crc32(seed.encode())
+    # Floor well above the page background so every tile reads as an image.
+    return (
+        100 + (h % 130),
+        100 + ((h >> 8) % 130),
+        100 + ((h >> 16) % 130),
+    )
 
 
 @dataclass
@@ -110,16 +146,19 @@ class FakeAdapter:
             saved = []
             for idx in indices:
                 dest = dest_dir / paths.full_filename(idx, ext)
-                payload = f"{shortcode}:{idx}".encode()
+                if post.is_video:
+                    payload = f"{shortcode}:{idx}".encode()
+                else:
+                    payload = _png(240, 240, _colour(f"{shortcode}:{idx}"))
                 size = paths.atomic_write(dest, lambda fh, p=payload: fh.write(p))
                 saved.append(
                     t.SavedFile(
                         child_idx=idx,
                         path=dest,
-                        mime="video/mp4" if post.is_video else "image/jpeg",
+                        mime="video/mp4" if post.is_video else "image/png",
                         bytes=size,
-                        width=1080,
-                        height=1350,
+                        width=240,
+                        height=240,
                     )
                 )
             return saved
@@ -129,9 +168,9 @@ class FakeAdapter:
     def download_to(self, url: str, dest: Path) -> t.SavedFile:
         started = self._enter("download_to")
         try:
-            payload = url.encode()
+            payload = _png(160, 160, _colour(url))
             size = paths.atomic_write(dest, lambda fh: fh.write(payload))
-            return t.SavedFile(0, dest, "image/jpeg", size, 320, 320)
+            return t.SavedFile(0, dest, "image/png", size, 160, 160)
         finally:
             self._exit("download_to", started)
 

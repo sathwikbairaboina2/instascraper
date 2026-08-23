@@ -1,43 +1,56 @@
 'use client'
 
+import { Layout, Table, Typography } from 'antd'
+
+import AppShell from '@/components/AppShell'
 import { getActivity, type ActivityItem } from '@/lib/api'
 import { usePolling } from '@/lib/usePolling'
 
-function summarise(item: ActivityItem): string {
-  const detail = item.detail
-  if (!detail) return ''
-  if (item.action === 'download') {
-    return `${detail.count} files as "${detail.base}" → ${detail.out}`
-  }
-  return JSON.stringify(detail)
+const { Content } = Layout
+const { Text } = Typography
+
+function detailOf(item: ActivityItem): string {
+  const d = item.detail
+  if (!d) return ''
+  if (item.action === 'download') return `${d.count} files as "${d.base}" to ${d.out}`
+  return JSON.stringify(d)
 }
 
 export default function ActivityPage() {
   const { data } = usePolling(() => getActivity(200), 5000)
 
   return (
-    <section>
-      <h1>Activity</h1>
-      <table data-testid="activity-table">
-        <thead>
-          <tr>
-            <th>When</th>
-            <th>Action</th>
-            <th>Target</th>
-            <th>Detail</th>
-          </tr>
-        </thead>
-        <tbody>
-          {(data?.items ?? []).map((item) => (
-            <tr key={item.id}>
-              <td className="muted">{item.ts.slice(0, 19).replace('T', ' ')}</td>
-              <td>{item.action}</td>
-              <td>{item.target ?? ''}</td>
-              <td className="muted">{summarise(item)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </section>
+    <AppShell>
+      <Content style={{ padding: 16, overflowY: 'auto' }}>
+        <Table
+          data-testid="activity-table"
+          size="small"
+          rowKey="id"
+          loading={!data}
+          dataSource={data?.items ?? []}
+          pagination={{ pageSize: 25, hideOnSinglePage: true }}
+          columns={[
+            {
+              title: 'When',
+              dataIndex: 'ts',
+              width: 170,
+              render: (ts: string) => (
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  {ts.slice(0, 19).replace('T', ' ')}
+                </Text>
+              ),
+            },
+            { title: 'Action', dataIndex: 'action', width: 110 },
+            { title: 'Target', dataIndex: 'target', width: 160 },
+            {
+              title: 'Detail',
+              render: (_: unknown, row: ActivityItem) => (
+                <Text type="secondary" style={{ fontSize: 12 }}>{detailOf(row)}</Text>
+              ),
+            },
+          ]}
+        />
+      </Content>
+    </AppShell>
   )
 }

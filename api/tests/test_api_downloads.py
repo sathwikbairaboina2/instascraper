@@ -40,7 +40,8 @@ def test_download_writes_numbered_files_oldest_first(client, ready, settings):
     assert body["count"] == 3
     written = sorted(p.name for p in settings.out_dir.iterdir())
     assert written == ["trip_01.jpg", "trip_02.jpg", "trip_03.jpg"]
-    assert (settings.out_dir / "trip_01.jpg").read_bytes() == b"nike-0:0"
+    # the fake writes real PNG bytes so a fake-adapter stack renders in a browser
+    assert (settings.out_dir / "trip_01.jpg").read_bytes()[1:4] == b"PNG"
 
 
 def test_download_names_carousel_children_with_letters(client, conn, settings, adapter):

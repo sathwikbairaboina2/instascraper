@@ -9,11 +9,15 @@ test.afterEach(async ({ page }) => {
 const tiles = (page: import('@playwright/test').Page) =>
   page.getByTestId('media-grid').locator('.tile')
 
+// antd Segmented renders labelled radios, not a native <select>.
+const pickKind = (page: import('@playwright/test').Page, label: string) =>
+  page.getByTestId('filter-kind').getByText(label, { exact: true }).click()
+
 test('kind filter narrows the grid to carousels', async ({ page }) => {
   await page.goto('/p/nike')
   await expect(tiles(page)).toHaveCount(8)
 
-  await page.getByTestId('filter-kind').selectOption('carousel')
+  await pickKind(page, 'Carousels')
 
   await expect(tiles(page)).toHaveCount(2)
   await expect(page.getByTestId('filter-count')).toHaveText('2 of 8 shown')
@@ -21,7 +25,7 @@ test('kind filter narrows the grid to carousels', async ({ page }) => {
 
 test('photos filter excludes the carousels', async ({ page }) => {
   await page.goto('/p/nike')
-  await page.getByTestId('filter-kind').selectOption('image')
+  await pickKind(page, 'Photos')
   await expect(tiles(page)).toHaveCount(6)
 })
 
@@ -48,7 +52,7 @@ test('cached-only keeps exactly the downloaded items', async ({ page }) => {
   await page.goto('/p/nike')
   await expect(tiles(page)).toHaveCount(8)
 
-  await page.getByTestId('filter-cached').check()
+  await page.getByTestId('filter-cached').click()
 
   await expect(tiles(page)).toHaveCount(3)
   await expect(page.getByTestId('filter-count')).toHaveText('3 of 8 shown')
@@ -56,7 +60,7 @@ test('cached-only keeps exactly the downloaded items', async ({ page }) => {
 
 test('reset restores the full grid', async ({ page }) => {
   await page.goto('/p/nike')
-  await page.getByTestId('filter-kind').selectOption('carousel')
+  await pickKind(page, 'Carousels')
   await expect(tiles(page)).toHaveCount(2)
 
   await page.getByTestId('filter-reset').click()
@@ -66,7 +70,7 @@ test('reset restores the full grid', async ({ page }) => {
 
 test('select all respects the active filter', async ({ page }) => {
   await page.goto('/p/nike')
-  await page.getByTestId('filter-kind').selectOption('carousel')
+  await pickKind(page, 'Carousels')
   await page.getByTestId('select-all').click()
 
   await expect(page.getByTestId('selection-count')).toHaveText('2 selected')
@@ -80,7 +84,7 @@ test('a saved selection can be stored and reloaded', async ({ page }) => {
   await page.getByTestId('save-selection').click()
 
   await page.getByTestId('clear-selection').click()
-  await expect(page.getByTestId('selection-bar')).toHaveCount(0)
+  await expect(page.getByTestId('selection-count')).toHaveCount(0)
 
   await page.getByTestId('load-selection-pair').click()
   await expect(page.getByTestId('selection-count')).toHaveText('2 selected')

@@ -1,18 +1,28 @@
 'use client'
 
+import { CheckCircleFilled, ExpandOutlined, ReloadOutlined } from '@ant-design/icons'
+import { Button, Checkbox, Flex, Progress, Space, Tooltip, Typography, theme } from 'antd'
+import { useState } from 'react'
+
 import type { MediaSummary } from '@/lib/api'
 
-const BADGE: Record<MediaSummary['kind'], string | null> = {
-  image: null,
-  video: 'video',
-  reel: 'reel',
-  carousel: null,
-}
+const { Text } = Typography
 
-function shortReason(message: string | null): string {
-  if (!message) return 'Fetch failed'
-  const firstLine = message.split('\n')[0]
-  return firstLine.length > 60 ? `${firstLine.slice(0, 59)}…` : firstLine
+function pill(children: React.ReactNode) {
+  return (
+    <span
+      style={{
+        fontSize: 10.5,
+        fontWeight: 600,
+        padding: '1px 7px',
+        borderRadius: 999,
+        background: 'rgba(6,8,12,.62)',
+        color: '#fff',
+      }}
+    >
+      {children}
+    </span>
+  )
 }
 
 export default function MediaTile({
@@ -28,55 +38,154 @@ export default function MediaTile({
   onRetry: () => void
   onPreview: () => void
 }) {
-  const badge = item.kind === 'carousel' ? String(item.child_count) : BADGE[item.kind]
-  const failed = item.full_status === 'failed'
+  const { token } = theme.useToken()
+  const [hover, setHover] = useState(false)
+  const busy = item.full_status === 'fetching' || item.full_status === 'queued'
+  const show = hover || selected
 
-  // The retry control is a sibling of the tile button, not a child: a button
-  // cannot nest a button, and nesting one would also swallow selection clicks.
   return (
-    <div className="tile-wrap">
-      <button
-        type="button"
-        className="tile"
-        data-testid={`tile-${item.shortcode}`}
+    <div
+      className="tile-wrap"
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{ position: 'relative', height: '100%' }}
+    >
+      <div
+        role="button"
+        tabIndex={0}
         aria-pressed={selected}
         aria-label={item.shortcode}
+        data-testid={`tile-${item.shortcode}`}
+        className="tile"
         onClick={(e) => onToggle(e.shiftKey)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            onToggle(e.shiftKey)
+          }
+        }}
+        style={{
+          position: 'relative',
+          width: '100%',
+          height: '100%',
+          aspectRatio: '1',
+          borderRadius: token.borderRadiusLG,
+          overflow: 'hidden',
+          cursor: 'pointer',
+          background: token.colorFillQuaternary,
+          transform: hover ? 'translateY(-2px)' : 'none',
+          transition: 'transform .16s ease, box-shadow .16s ease',
+          boxShadow: selected
+            ? `0 0 0 2.5px ${token.colorPrimary}`
+            : hover
+              ? `0 10px 26px rgba(0,0,0,.45), 0 0 0 1px ${token.colorBorder}`
+              : `0 0 0 1px ${token.colorBorderSecondary}`,
+        }}
       >
-        <img src={item.thumb_url} alt="" loading="lazy" />
-        {badge && <span className="badge">{badge}</span>}
-        {item.full_status === 'ready' && (
-          <span className="badge badge-br">cached</span>
+        <img
+          src={item.thumb_url}
+          alt=""
+          loading="lazy"
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            display: 'block',
+            filter: item.full_status === 'none' && !show ? 'saturate(.72) brightness(.92)' : 'none',
+            transition: 'filter .18s ease',
+          }}
+        />
+
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            pointerEvents: 'none',
+            transition: 'opacity .18s ease',
+            opacity: show || busy || item.full_status === 'failed' ? 1 : 0.45,
+            background: 'linear-gradient(180deg, rgba(4,6,10,.5), rgba(4,6,10,0) 34%, rgba(4,6,10,.66))',
+          }}
+        />
+
+        <Space size={4} style={{ position: 'absolute', top: 8, left: 38 }}>
+          {item.kind === 'carousel' && pill(item.child_count)}
+          {(item.kind === 'reel' || item.kind === 'video') && pill(item.kind)}
+        </Space>
+
+        {item.full_status === 'ready' && !busy && (
+          <CheckCircleFilled
+            style={{ position: 'absolute', left: 10, bottom: 9, color: token.colorSuccess, fontSize: 14 }}
+          />
         )}
-        {item.full_status === 'queued' && <span className="badge badge-br">queued</span>}
-        {item.full_status === 'fetching' && <span className="badge badge-br">fetching</span>}
-      </button>
 
-      <button
-        type="button"
-        className="tile-preview"
-        data-testid={`preview-${item.shortcode}`}
-        aria-label={`Preview ${item.shortcode}`}
-        title="Preview"
-        onClick={onPreview}
-      >
-        ⤢
-      </button>
+        {busy && (
+          <div style={{ position: 'absolute', left: 9, right: 9, bottom: 8 }}>
+            <Text style={{ fontSize: 10.5, color: '#eef2f8', display: 'block', marginBottom: 3 }}>
+              {item.full_status}
+            </Text>
+            <Progress
+              percent={item.full_status === 'queued' ? 8 : 60}
+              showInfo={false}
+              size="small"
+              status="active"
+              style={{ margin: 0, lineHeight: 1 }}
+            />
+          </div>
+        )}
+      </div>
 
-      {failed && (
-        <div className="tile-failed" data-testid={`failed-${item.shortcode}`}>
-          <span className="tile-failed-msg" title={item.full_error ?? 'Fetch failed'}>
-            {shortReason(item.full_error)}
-          </span>
-          <button
-            type="button"
-            className="tile-retry"
+      {/* Controls sit outside the tile button: a button cannot nest a button,
+          and nesting would swallow the selection click. */}
+      <div style={{ position: 'absolute', top: 8, left: 8, opacity: show ? 1 : 0.55, transition: 'opacity .15s ease' }}>
+        <Checkbox checked={selected} onChange={() => onToggle(false)} />
+      </div>
+
+      {/* Always rendered, never hover gated. A control that only exists on
+          hover cannot be reached by keyboard or touch. */}
+      <Tooltip title="Preview">
+        <Button
+          size="small"
+          type="text"
+          shape="circle"
+          data-testid={`preview-${item.shortcode}`}
+          aria-label={`Preview ${item.shortcode}`}
+          icon={<ExpandOutlined />}
+          onClick={onPreview}
+          style={{
+            position: 'absolute',
+            top: 8,
+            right: 8,
+            color: '#fff',
+            background: 'rgba(6,8,12,.55)',
+            opacity: show ? 1 : 0.5,
+            transition: 'opacity .15s ease',
+          }}
+        />
+      </Tooltip>
+
+      {item.full_status === 'failed' && (
+        <Flex
+          align="center"
+          gap={6}
+          data-testid={`failed-${item.shortcode}`}
+          style={{ position: 'absolute', left: 9, right: 9, bottom: 8 }}
+        >
+          <Tooltip title={item.full_error ?? 'Fetch failed'}>
+            <Text style={{ flex: 1, fontSize: 10.5, color: token.colorErrorText }} ellipsis>
+              {item.full_error ?? 'Fetch failed'}
+            </Text>
+          </Tooltip>
+          <Button
+            size="small"
+            type="text"
+            danger
+            shape="circle"
             data-testid={`retry-${item.shortcode}`}
+            aria-label={`Retry ${item.shortcode}`}
+            icon={<ReloadOutlined />}
             onClick={onRetry}
-          >
-            Retry
-          </button>
-        </div>
+          />
+        </Flex>
       )}
     </div>
   )

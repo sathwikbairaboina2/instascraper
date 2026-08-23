@@ -73,7 +73,7 @@ test('retrying does not toggle the tile selection', async ({ page }) => {
   await page.getByTestId('retry-nike-0').click()
 
   await expect(page.getByTestId('tile-nike-0')).toHaveAttribute('aria-pressed', 'false')
-  await expect(page.getByTestId('selection-bar')).toHaveCount(0)
+  await expect(page.getByTestId('selection-count')).toHaveCount(0)
 })
 
 test('the selection bar names which items failed', async ({ page }) => {

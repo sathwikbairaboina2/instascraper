@@ -26,7 +26,7 @@ test('select all then clear', async ({ page }) => {
   await page.getByTestId('select-all').click()
   await expect(page.getByTestId('selection-count')).toHaveText('8 selected')
   await page.getByTestId('clear-selection').click()
-  await expect(page.getByTestId('selection-bar')).toHaveCount(0)
+  await expect(page.getByTestId('selection-count')).toHaveCount(0)
 })
 
 test('load more is disabled once the profile is exhausted', async ({ page }) => {

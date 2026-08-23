@@ -24,7 +24,7 @@ test('preview opens a lightbox without selecting the tile', async ({ page }) => 
 
   await expect(page.getByTestId('lightbox')).toBeVisible()
   await expect(page.getByTestId('tile-nike-0')).toHaveAttribute('aria-pressed', 'false')
-  await expect(page.getByTestId('selection-bar')).toHaveCount(0)
+  await expect(page.getByTestId('selection-count')).toHaveCount(0)
 })
 
 test('an uncached item previews the thumbnail with a fetch offer', async ({ page }) => {

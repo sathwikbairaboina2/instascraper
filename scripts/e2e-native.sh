@@ -19,9 +19,6 @@ export IG_ADAPTER=fake
 export PAGE_SIZE=36
 export IG_MIN_INTERVAL=0
 
-rm -rf .e2e
-mkdir -p .e2e/data .e2e/downloads
-
 # Kill whatever is listening on a port, process tree included.
 # `kill $!` is not enough: npx and uvicorn both spawn children that survive
 # it on Windows, and a leaked server silently serves the next run.
@@ -43,8 +40,12 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# Refuse to run against servers left over from a previous attempt.
+# Kill leftovers BEFORE touching .e2e: a server still holding the SQLite
+# file makes the rm fail, and set -e then aborts the whole run.
 cleanup
+
+rm -rf .e2e
+mkdir -p .e2e/data .e2e/downloads
 
 (cd api && "../$PY" scripts/seed_e2e.py)
 

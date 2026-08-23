@@ -1,8 +1,12 @@
 'use client'
 
+import { CloudDownloadOutlined, LeftOutlined, LinkOutlined, RightOutlined } from '@ant-design/icons'
+import { Button, Flex, Modal, Spin, Typography } from 'antd'
 import { useCallback, useEffect, useState } from 'react'
 
 import type { MediaSummary } from '@/lib/api'
+
+const { Text } = Typography
 
 export default function Lightbox({
   item,
@@ -11,12 +15,17 @@ export default function Lightbox({
 }: {
   item: MediaSummary
   onClose: () => void
-  onFetch: (shortcode: string) => void
+  onFetch: (shortcode: string) => Promise<void>
 }) {
   const isCarousel = item.child_count > 1
   const first = isCarousel ? 1 : 0
   const [child, setChild] = useState(first)
+  // Optimistic: the button reflects the click straight away rather than
+  // waiting for the next poll to report the queued state.
+  const [asked, setAsked] = useState(false)
+
   const ready = item.full_status === 'ready'
+  const working = !ready && (asked || item.full_status === 'queued' || item.full_status === 'fetching')
 
   const step = useCallback(
     (delta: number) => {
@@ -33,77 +42,85 @@ export default function Lightbox({
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
       if (e.key === 'ArrowRight') step(1)
       if (e.key === 'ArrowLeft') step(-1)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onClose, step])
+  }, [step])
 
   const src = `/api/media/${item.shortcode}/full?child=${child}`
 
   return (
-    <div
-      className="lightbox"
-      data-testid="lightbox"
-      role="dialog"
-      aria-modal="true"
-      aria-label={item.shortcode}
-      onClick={onClose}
+    <Modal
+      open
+      onCancel={onClose}
+      footer={null}
+      width="min(1100px, 92vw)"
+      centered
+      title={
+        <Flex align="center" gap={10}>
+          <Text code style={{ fontSize: 12 }}>{item.shortcode}</Text>
+          {isCarousel && (
+            <Text type="secondary" style={{ fontSize: 12 }}>{child} of {item.child_count}</Text>
+          )}
+          <div style={{ flex: 1 }} />
+          <Button size="small" icon={<LinkOutlined />} href={item.ig_url} target="_blank">
+            Instagram
+          </Button>
+        </Flex>
+      }
     >
-      <div className="lightbox-inner" onClick={(e) => e.stopPropagation()}>
-        <div className="lightbox-bar">
-          <span className="lightbox-title">
-            {item.shortcode}
-            {isCarousel && (
-              <span className="muted">
-                {' '}
-                · {child}/{item.child_count}
-              </span>
-            )}
-          </span>
-          <a href={item.ig_url} target="_blank" rel="noreferrer">
-            Open on Instagram
-          </a>
-          <button type="button" data-testid="lightbox-close" onClick={onClose}>
-            Close
-          </button>
-        </div>
-
-        <div className="lightbox-stage">
-          {ready ? (
-            item.is_video ? (
-              <video data-testid="lightbox-video" src={src} controls autoPlay />
-            ) : (
-              <img data-testid="lightbox-image" src={src} alt={item.shortcode} />
-            )
+      <Flex vertical align="center" gap={12} data-testid="lightbox">
+        {ready ? (
+          item.is_video ? (
+            <video data-testid="lightbox-video" src={src} controls autoPlay style={{ maxWidth: '100%', maxHeight: '72vh' }} />
           ) : (
-            <div className="lightbox-placeholder" data-testid="lightbox-placeholder">
-              <img src={item.thumb_url} alt="" />
-              <p>Not downloaded yet — this is the thumbnail.</p>
-              <button
-                type="button"
+            <img data-testid="lightbox-image" src={src} alt={item.shortcode} style={{ maxWidth: '100%', maxHeight: '72vh' }} />
+          )
+        ) : (
+          <Flex vertical align="center" gap={12} data-testid="lightbox-placeholder">
+            <div style={{ position: 'relative' }}>
+              <img
+                src={item.thumb_url}
+                alt=""
+                style={{ maxHeight: '50vh', maxWidth: '100%', opacity: working ? 0.35 : 0.6, filter: 'blur(1px)' }}
+              />
+              {working && (
+                <Spin
+                  size="large"
+                  style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center' }}
+                />
+              )}
+            </div>
+            <Text type="secondary">
+              {working ? 'Fetching full quality' : 'Not downloaded yet. This is the thumbnail.'}
+            </Text>
+            {!working && (
+              <Button
+                type="primary"
                 data-testid="lightbox-fetch"
-                onClick={() => onFetch(item.shortcode)}
+                icon={<CloudDownloadOutlined />}
+                onClick={async () => {
+                  setAsked(true)
+                  await onFetch(item.shortcode)
+                }}
               >
                 Fetch full quality
-              </button>
-            </div>
-          )}
-        </div>
+              </Button>
+            )}
+          </Flex>
+        )}
 
         {isCarousel && ready && (
-          <div className="lightbox-nav">
-            <button type="button" data-testid="lightbox-prev" onClick={() => step(-1)}>
-              ‹ Prev
-            </button>
-            <button type="button" data-testid="lightbox-next" onClick={() => step(1)}>
-              Next ›
-            </button>
-          </div>
+          <Flex gap={10}>
+            <Button data-testid="lightbox-prev" icon={<LeftOutlined />} onClick={() => step(-1)}>Prev</Button>
+            <Button data-testid="lightbox-next" onClick={() => step(1)}>
+              Next <RightOutlined />
+            </Button>
+          </Flex>
         )}
-      </div>
-    </div>
+      </Flex>
+    </Modal>
   )
 }

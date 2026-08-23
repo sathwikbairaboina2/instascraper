@@ -1,10 +1,11 @@
 import { expect, test } from '@playwright/test'
 
-test('selection bar appears only when something is selected', async ({ page }) => {
+test('the inspector appears only when something is selected', async ({ page }) => {
   await page.goto('/p/nike')
-  await expect(page.getByTestId('selection-bar')).toHaveCount(0)
+  await expect(page.getByTestId('selection-count')).toHaveCount(0)
   await page.getByTestId('tile-nike-0').click()
-  await expect(page.getByTestId('selection-bar')).toBeVisible()
+  await expect(page.getByTestId('selection-count')).toBeVisible()
+  await expect(page.getByTestId('download-submit')).toBeVisible()
 })
 
 test('downloading three items reports the output directory', async ({ page }) => {

@@ -1,8 +1,12 @@
 'use client'
 
+import { CloudDownloadOutlined, ReloadOutlined } from '@ant-design/icons'
+import { Alert, Button, Input, Progress, Typography } from 'antd'
 import { useEffect, useRef, useState } from 'react'
 
 import { createDownload, ensureMedia, type DownloadResult, type EnsureResult } from '@/lib/api'
+
+const { Text } = Typography
 
 type Phase = 'idle' | 'waiting' | 'copying' | 'done' | 'error'
 
@@ -10,14 +14,19 @@ const POLL_MS = 1500
 
 export default function SelectionBar({
   shortcodes,
+  base,
+  onBase,
+  fileCount,
   onClear,
   onDone,
 }: {
   shortcodes: string[]
+  base: string
+  onBase: (v: string) => void
+  fileCount: number
   onClear: () => void
   onDone: () => void
 }) {
-  const [base, setBase] = useState('')
   const [phase, setPhase] = useState<Phase>('idle')
   const [progress, setProgress] = useState<EnsureResult | null>(null)
   const [result, setResult] = useState<DownloadResult | null>(null)
@@ -25,7 +34,6 @@ export default function SelectionBar({
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const key = shortcodes.join(',')
 
-  // Changing the selection abandons any in-flight flow.
   useEffect(() => {
     if (timer.current) clearTimeout(timer.current)
     setPhase('idle')
@@ -40,16 +48,6 @@ export default function SelectionBar({
     },
     [],
   )
-
-  if (shortcodes.length === 0) return null
-
-  const counts = (statuses: Record<string, string>) => {
-    const tally: Record<string, number> = {}
-    for (const value of Object.values(statuses)) tally[value] = (tally[value] ?? 0) + 1
-    return Object.entries(tally)
-      .map(([k, v]) => `${v} ${k}`)
-      .join(' · ')
-  }
 
   async function copyNow() {
     setPhase('copying')
@@ -71,14 +69,8 @@ export default function SelectionBar({
 
       const failed = Object.entries(state.errors ?? {})
       if (failed.length > 0) {
-        // Name what broke and why -- "some items failed" tells you nothing
-        // about whether to retry or to go fix the session.
-        const shown = failed
-          .slice(0, 3)
-          .map(([shortcode, reason]) => `${shortcode}: ${reason}`)
-          .join(' · ')
-        const rest = failed.length > 3 ? ` (+${failed.length - 3} more)` : ''
-        setError(`${failed.length} failed — ${shown}${rest}`)
+        const shown = failed.slice(0, 2).map(([sc, why]) => `${sc}: ${why}`).join(' · ')
+        setError(`${failed.length} failed. ${shown}${failed.length > 2 ? ` (+${failed.length - 2} more)` : ''}`)
         setPhase('error')
         return
       }
@@ -99,8 +91,7 @@ export default function SelectionBar({
   }
 
   async function start() {
-    const clean = base.trim()
-    if (!clean) {
+    if (!base.trim()) {
       setError('Enter a base filename first.')
       setPhase('error')
       return
@@ -118,47 +109,72 @@ export default function SelectionBar({
     await step()
   }
 
+  const running = phase === 'waiting' || phase === 'copying'
+  const pct = progress && progress.total ? Math.round((progress.ready / progress.total) * 100) : 0
+
   return (
-    <div className="selection-bar" data-testid="selection-bar">
-      <strong data-testid="selection-count">{shortcodes.length} selected</strong>
-
-      <input
+    <>
+      <Text style={{ fontSize: 12, display: 'block', marginBottom: 7 }}>Base filename</Text>
+      <Input
         data-testid="base-filename"
-        placeholder="base filename"
         value={base}
-        onChange={(e) => setBase(e.target.value)}
-        disabled={phase === 'waiting' || phase === 'copying'}
+        onChange={(e) => onBase(e.target.value)}
+        placeholder="nike_ss26"
+        disabled={running}
       />
+      {base.trim() && (
+        <Text type="secondary" style={{ fontSize: 11, display: 'block', marginTop: 7 }}>
+          {base.trim()}_01 through {base.trim()}_{String(fileCount).padStart(2, '0')}
+        </Text>
+      )}
 
-      <button
+      <Button
+        type="primary"
+        block
+        size="large"
         data-testid="download-submit"
+        icon={<CloudDownloadOutlined />}
+        loading={running}
         onClick={start}
-        disabled={phase === 'waiting' || phase === 'copying'}
+        style={{ marginTop: 16 }}
       >
-        Download
-      </button>
+        {running ? 'Downloading' : `Download ${fileCount} files`}
+      </Button>
 
-      <button data-testid="clear-selection" onClick={onClear}>
-        Clear
-      </button>
+      <Button block type="text" data-testid="clear-selection" style={{ marginTop: 8 }} onClick={onClear}>
+        Clear selection
+      </Button>
 
-      {(phase === 'waiting' || phase === 'copying') && progress && (
-        <span className="muted" data-testid="download-progress">
-          {phase === 'copying' ? 'Copying files…' : counts(progress.statuses)}
-        </span>
+      {running && progress && (
+        <div style={{ marginTop: 14 }} data-testid="download-progress">
+          <Progress percent={pct} size="small" status="active" />
+          <Text type="secondary" style={{ fontSize: 11 }}>
+            {phase === 'copying' ? 'Copying files' : `${progress.ready} of ${progress.total} ready`}
+          </Text>
+        </div>
       )}
 
       {phase === 'done' && result && (
-        <span data-testid="download-result">
-          {result.count} files → {result.out_dir}
-        </span>
+        <Alert
+          style={{ marginTop: 14 }}
+          type="success"
+          showIcon
+          data-testid="download-result"
+          title={`${result.count} files`}
+          description={result.out_dir}
+        />
       )}
 
       {phase === 'error' && error && (
-        <span role="alert" data-testid="download-error">
-          {error} <button onClick={retry}>Retry</button>
-        </span>
+        <Alert
+          style={{ marginTop: 14 }}
+          type="error"
+          showIcon
+          data-testid="download-error"
+          title={error}
+          action={<Button size="small" icon={<ReloadOutlined />} onClick={retry}>Retry</Button>}
+        />
       )}
-    </div>
+    </>
   )
 }
