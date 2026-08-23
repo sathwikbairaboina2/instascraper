@@ -79,3 +79,24 @@ def test_only_adapter_module_imports_instaloader():
         if "instaloader" in p.read_text() and p.name not in allowed
     ]
     assert offenders == []
+
+
+def test_seeded_adapter_is_shared_by_make_adapter(settings):
+    """The seed script and the running server must agree on the fake dataset.
+
+    If make_adapter() returns an empty FakeAdapter, a seeded database refers
+    to posts the server has never heard of and every media_fetch fails.
+    """
+    from app.ig.adapter import make_adapter
+    from app.ig.fake import seeded_adapter
+
+    served = make_adapter(settings)
+    canonical = seeded_adapter()
+
+    assert set(served.profiles) == set(canonical.profiles)
+    assert [p.shortcode for p in served.posts["nike"]] == [
+        p.shortcode for p in canonical.posts["nike"]
+    ]
+    # every seeded shortcode must be fetchable
+    for post in canonical.posts["nike"]:
+        assert served._find_post(post.shortcode).shortcode == post.shortcode

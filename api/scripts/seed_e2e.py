@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app import db
 from app.config import load_settings
-from app.ig.fake import FakeAdapter
+from app.ig.fake import seeded_adapter
 from app.worker import handlers
 from app.worker.pacer import Pacer
 from app.worker.runner import HandlerContext
@@ -23,10 +23,7 @@ def main() -> int:
     for directory in (settings.media_dir, settings.out_dir):
         directory.mkdir(parents=True, exist_ok=True)
 
-    adapter = FakeAdapter()
-    adapter.add_profile("nike", post_count=8)
-    adapter.add_posts("nike", count=6)
-    adapter.add_posts("nike", count=2, child_count=3)
+    adapter = seeded_adapter()
 
     ctx = HandlerContext(
         conn=conn, adapter=adapter, settings=settings,

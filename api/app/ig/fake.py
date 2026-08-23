@@ -138,3 +138,18 @@ class FakeAdapter:
     def login(self) -> None:
         started = self._enter("login")
         self._exit("login", started)
+
+
+def seeded_adapter() -> FakeAdapter:
+    """The canonical fake dataset.
+
+    Shared by scripts/seed_e2e.py and by make_adapter() when IG_ADAPTER=fake,
+    so a fake-adapter stack can actually serve the media it seeded. Without a
+    single source, the seeded database references posts the running server's
+    adapter has never heard of and every media_fetch fails with IgNotFound.
+    """
+    adapter = FakeAdapter()
+    adapter.add_profile("nike", post_count=8)
+    adapter.add_posts("nike", count=6)
+    adapter.add_posts("nike", count=2, child_count=3)
+    return adapter

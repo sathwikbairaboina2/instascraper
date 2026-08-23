@@ -207,7 +207,7 @@ class InstaloaderAdapter:
 
 def make_adapter(settings: Settings):
     if settings.adapter == "fake":
-        from app.ig.fake import FakeAdapter
+        from app.ig.fake import seeded_adapter
 
-        return FakeAdapter()
+        return seeded_adapter()
     return InstaloaderAdapter(settings)
