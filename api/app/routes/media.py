@@ -60,11 +60,13 @@ def get_full(
 @router.post("/media/ensure")
 def ensure(body: EnsureBody, request: Request, conn=Depends(get_conn_dep)):
     statuses: dict[str, str] = {}
+    errors: dict[str, str] = {}
     enqueued = False
 
     for shortcode in body.shortcodes:
         item = conn.execute(
-            "SELECT full_status FROM media_items WHERE shortcode=?", (shortcode,)
+            "SELECT full_status, full_error FROM media_items WHERE shortcode=?",
+            (shortcode,),
         ).fetchone()
         if item is None:
             statuses[shortcode] = "unknown"
@@ -75,6 +77,8 @@ def ensure(body: EnsureBody, request: Request, conn=Depends(get_conn_dep)):
             status = "none"
         if status in ("ready", "queued", "fetching", "failed"):
             statuses[shortcode] = status
+            if status == "failed":
+                errors[shortcode] = item["full_error"] or "unknown error"
             continue
 
         queue.enqueue_unique(conn, "media_fetch", {"shortcode": shortcode})
@@ -90,6 +94,7 @@ def ensure(body: EnsureBody, request: Request, conn=Depends(get_conn_dep)):
 
     return {
         "statuses": statuses,
+        "errors": errors,
         "ready": sum(1 for s in statuses.values() if s == "ready"),
         "total": len(statuses),
     }

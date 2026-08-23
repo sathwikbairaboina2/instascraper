@@ -33,6 +33,7 @@ export type MediaSummary = {
   is_video: boolean
   child_count: number
   full_status: 'none' | 'queued' | 'fetching' | 'ready' | 'failed'
+  full_error: string | null
   thumb_url: string
   ig_url: string
 }
@@ -40,6 +41,7 @@ export type MediaSummary = {
 export type MediaPage = { items: MediaSummary[]; total: number; exhausted: boolean }
 export type EnsureResult = {
   statuses: Record<string, string>
+  errors: Record<string, string>
   ready: number
   total: number
 }

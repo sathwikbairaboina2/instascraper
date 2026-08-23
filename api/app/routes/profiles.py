@@ -34,6 +34,7 @@ def _media_summary(row) -> dict:
         "is_video": bool(row["is_video"]),
         "child_count": row["child_count"],
         "full_status": row["full_status"],
+        "full_error": row["full_error"],
         "thumb_url": f"/api/media/{row['shortcode']}/thumb",
         "ig_url": row["ig_url"],
     }

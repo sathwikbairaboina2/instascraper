@@ -4,7 +4,7 @@ import { use, useCallback, useMemo, useState } from 'react'
 
 import MediaGrid from '@/components/MediaGrid'
 import SelectionBar from '@/components/SelectionBar'
-import { clearCache, getMedia, getProfile, loadMore, setTracked } from '@/lib/api'
+import { clearCache, ensureMedia, getMedia, getProfile, loadMore, setTracked } from '@/lib/api'
 import { usePolling } from '@/lib/usePolling'
 import { useSelection } from '@/lib/useSelection'
 
@@ -27,6 +27,14 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
   const items = useMemo(() => media?.items ?? [], [media])
   const ids = useMemo(() => items.map((i) => i.shortcode), [items])
   const selection = useSelection(ids)
+
+  const onRetry = useCallback(
+    async (shortcode: string) => {
+      await ensureMedia([shortcode], true)
+      await refreshMedia()
+    },
+    [refreshMedia],
+  )
 
   const onLoadMore = useCallback(async () => {
     setBusy(true)
@@ -102,6 +110,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
         items={items}
         isSelected={selection.isSelected}
         onToggle={selection.toggle}
+        onRetry={onRetry}
         exhausted={media?.exhausted ?? false}
         loading={busy}
         onLoadMore={onLoadMore}

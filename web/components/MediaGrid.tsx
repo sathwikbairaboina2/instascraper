@@ -7,6 +7,7 @@ export default function MediaGrid({
   items,
   isSelected,
   onToggle,
+  onRetry,
   exhausted,
   loading,
   onLoadMore,
@@ -14,6 +15,7 @@ export default function MediaGrid({
   items: MediaSummary[]
   isSelected: (shortcode: string) => boolean
   onToggle: (shortcode: string, shiftKey: boolean) => void
+  onRetry: (shortcode: string) => void
   exhausted: boolean
   loading: boolean
   onLoadMore: () => void
@@ -27,6 +29,7 @@ export default function MediaGrid({
             item={item}
             selected={isSelected(item.shortcode)}
             onToggle={(shiftKey) => onToggle(item.shortcode, shiftKey)}
+            onRetry={() => onRetry(item.shortcode)}
           />
         ))}
       </div>

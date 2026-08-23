@@ -69,8 +69,16 @@ export default function SelectionBar({
       const state = await ensureMedia(shortcodes)
       setProgress(state)
 
-      if (Object.values(state.statuses).includes('failed')) {
-        setError('Some items failed to download from Instagram.')
+      const failed = Object.entries(state.errors ?? {})
+      if (failed.length > 0) {
+        // Name what broke and why -- "some items failed" tells you nothing
+        // about whether to retry or to go fix the session.
+        const shown = failed
+          .slice(0, 3)
+          .map(([shortcode, reason]) => `${shortcode}: ${reason}`)
+          .join(' · ')
+        const rest = failed.length > 3 ? ` (+${failed.length - 3} more)` : ''
+        setError(`${failed.length} failed — ${shown}${rest}`)
         setPhase('error')
         return
       }
