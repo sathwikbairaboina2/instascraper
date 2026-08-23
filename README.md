@@ -52,6 +52,28 @@ finishes immediately.
   A failure there means `api/app/ig/adapter.py` needs updating. That is the
   only file that should ever need to change for this class of break.
 
+## Upgrading Instaloader
+
+Instagram rotates internal identifiers and breaks Instaloader every few weeks.
+When that happens the canary fails and `api/app/ig/adapter.py` needs a look —
+`classify()` and `post_to_igpost()` first. Upgrading is scripted:
+
+    bash scripts/bump-instaloader.sh --check      # test the current pin
+    bash scripts/bump-instaloader.sh 4.15.3       # bump, verify, report
+
+The script runs the adapter's contract tests before and after, installs the new
+version, then runs the live canary. A failed install or failed contract suite
+restores the old pin automatically.
+
+**It will not call a bump verified without the canary.** A green contract suite
+only proves the parsers still agree with checked-in fixtures — not with
+Instagram. Without credentials in `.env` the script reports `PARTIAL` and says
+so explicitly.
+
+Current status: `4.15.3` passes the contract suite and the full backend suite,
+but has never been checked against live Instagram. The pin stays at `4.14.1`
+until it has.
+
 ## Tests
 
     cd api && python -m pytest        # backend, no network (125 tests)
