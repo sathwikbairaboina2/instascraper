@@ -1,0 +1,121 @@
+import json
+
+from app.worker import handlers, queue
+from app.worker.pacer import Pacer
+from app.worker.runner import HandlerContext
+
+
+def seed(client, conn, settings, adapter, username="nike"):
+    ctx = HandlerContext(
+        conn=conn, adapter=adapter, settings=settings,
+        pacer=Pacer(0.0), enqueue=lambda *a: None,
+    )
+    handlers.handle_profile_sync(ctx, {"username": username})
+    handlers.handle_page_fetch(ctx, {"username": username})
+
+
+def test_sync_enqueues_a_job_and_logs_the_lookup(client, conn):
+    body = client.post("/api/profiles/nike/sync").json()
+    assert body["queued"] is True
+
+    row = conn.execute("SELECT * FROM jobs").fetchone()
+    assert row["kind"] == "profile_sync"
+    assert json.loads(row["payload"]) == {"username": "nike"}
+    assert conn.execute(
+        "SELECT action FROM activity_log"
+    ).fetchone()["action"] == "lookup"
+
+
+def test_sync_is_idempotent_while_queued(client):
+    assert client.post("/api/profiles/nike/sync").json()["queued"] is True
+    assert client.post("/api/profiles/nike/sync").json()["queued"] is False
+
+
+def test_get_unknown_profile_is_404_with_last_error(client, conn):
+    queue.enqueue(conn, "profile_sync", {"username": "ghost"})
+    job_id = queue.claim_next(conn)["id"]
+    queue.fail(conn, job_id, "ghost does not exist", retryable=False)
+
+    resp = client.get("/api/profiles/ghost")
+
+    assert resp.status_code == 404
+    assert "does not exist" in resp.json()["detail"]["last_error"]
+
+
+def test_get_profile_returns_detail(client, conn, settings, adapter):
+    seed(client, conn, settings, adapter)
+
+    body = client.get("/api/profiles/nike").json()
+
+    assert body["username"] == "nike"
+    assert body["post_count"] == 10
+    assert body["avatar_url"] == "/api/profiles/nike/avatar"
+    assert body["exhausted"] is False
+    assert body["cached_count"] == 0
+
+
+def test_media_page_returns_thumb_urls_and_total(client, conn, settings, adapter):
+    seed(client, conn, settings, adapter)
+
+    body = client.get("/api/profiles/nike/media?limit=2&offset=0").json()
+
+    assert body["total"] == settings.page_size
+    assert len(body["items"]) == 2
+    assert body["items"][0]["thumb_url"].startswith("/api/media/")
+    assert body["items"][0]["full_status"] == "none"
+    assert body["exhausted"] is False
+
+
+def test_media_page_is_newest_first(client, conn, settings, adapter):
+    seed(client, conn, settings, adapter)
+    items = client.get("/api/profiles/nike/media?limit=50").json()["items"]
+    taken = [i["taken_at"] for i in items]
+    assert taken == sorted(taken, reverse=True)
+
+
+def test_tracked_toggle_round_trips(client, conn, settings, adapter):
+    seed(client, conn, settings, adapter)
+
+    assert client.put("/api/profiles/nike/tracked", json={"tracked": True}).json() == {
+        "tracked": True
+    }
+    assert [p["username"] for p in client.get("/api/profiles").json()["items"]] == ["nike"]
+
+    client.put("/api/profiles/nike/tracked", json={"tracked": False})
+    assert client.get("/api/profiles").json()["items"] == []
+
+
+def test_load_more_enqueues_page_fetch(client, conn, settings, adapter):
+    seed(client, conn, settings, adapter)
+
+    body = client.post("/api/profiles/nike/load-more").json()
+
+    assert body == {"queued": True, "exhausted": False}
+    assert conn.execute(
+        "SELECT kind FROM jobs ORDER BY id DESC"
+    ).fetchone()["kind"] == "page_fetch"
+
+
+def test_load_more_on_exhausted_profile_queues_nothing(client, conn, settings, adapter):
+    seed(client, conn, settings, adapter)
+    conn.execute("UPDATE profiles SET next_cursor='' WHERE username='nike'")
+
+    body = client.post("/api/profiles/nike/load-more").json()
+
+    assert body == {"queued": False, "exhausted": True}
+    assert conn.execute("SELECT COUNT(*) c FROM jobs").fetchone()["c"] == 0
+
+
+def test_clear_cache_removes_files_and_resets_status(client, conn, settings, adapter):
+    seed(client, conn, settings, adapter)
+    conn.execute("UPDATE media_items SET full_status='ready'")
+
+    body = client.delete("/api/profiles/nike/cache").json()
+
+    assert body["removed_files"] > 0
+    assert not (settings.media_dir / "nike").exists()
+    statuses = {
+        r["full_status"] for r in conn.execute("SELECT full_status FROM media_items")
+    }
+    assert statuses == {"none"}
+    assert conn.execute("SELECT COUNT(*) c FROM media_files").fetchone()["c"] == 0
