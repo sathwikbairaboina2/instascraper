@@ -1,0 +1,12 @@
+.env
+data/
+downloads/
+.e2e/
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+node_modules/
+.next/
+test-results/
+playwright-report/
