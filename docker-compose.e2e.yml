@@ -1,0 +1,12 @@
+services:
+  api:
+    environment:
+      IG_ADAPTER: fake
+      IG_MIN_INTERVAL: "0"
+      PAGE_SIZE: "36"
+    volumes:
+      - ./.e2e/data:/data
+      - ./.e2e/downloads:/out
+  web:
+    environment:
+      IG_ADAPTER: fake
