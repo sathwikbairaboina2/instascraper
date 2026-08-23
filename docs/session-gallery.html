@@ -1,0 +1,272 @@
+<title>Instascraper Design Gallery</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --page: #f3f4f6;
+    --card: #ffffff;
+    --sunk: #f7f8fa;
+    --line: #e2e4e9;
+    --hair: #edeff2;
+    --ink: #14161a;
+    --dim: #575c66;
+    --faint: #878d97;
+    --accent: #3564e0;
+    --ok: #157347;
+    --warn: #9a5b00;
+    --bad: #b3261e;
+    --sans: "Geist", "Segoe UI", system-ui, sans-serif;
+    --mono: "Geist Mono", ui-monospace, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --page: #0a0b0e;
+      --card: #131519;
+      --sunk: #0f1114;
+      --line: #262a31;
+      --hair: #1c1f25;
+      --ink: #e9ebef;
+      --dim: #a4aab5;
+      --faint: #6f7681;
+      --accent: #7aa2ff;
+      --ok: #4cc38a;
+      --warn: #e0a33a;
+      --bad: #f2685f;
+    }
+  }
+  :root[data-theme="dark"] {
+    --page: #0a0b0e; --card: #131519; --sunk: #0f1114; --line: #262a31;
+    --hair: #1c1f25; --ink: #e9ebef; --dim: #a4aab5; --faint: #6f7681;
+    --accent: #7aa2ff; --ok: #4cc38a; --warn: #e0a33a; --bad: #f2685f;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--page); color: var(--ink);
+    font-family: var(--sans); font-size: 15px; line-height: 1.6;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 52px 24px 90px; }
+
+  h1 {
+    font-size: clamp(28px, 4.4vw, 40px); font-weight: 700; letter-spacing: -0.03em;
+    line-height: 1.08; margin: 0 0 12px; text-wrap: balance;
+  }
+  .lede { color: var(--dim); max-width: 62ch; margin: 0 0 22px; }
+  .facts { display: flex; flex-wrap: wrap; gap: 7px; font-family: var(--mono); font-size: 11.5px; }
+  .facts span {
+    padding: 3px 10px; border: 1px solid var(--line); border-radius: 999px;
+    background: var(--card); color: var(--dim);
+  }
+
+  h2 {
+    font-size: 20px; font-weight: 600; letter-spacing: -0.015em;
+    margin: 54px 0 4px; display: flex; align-items: baseline; gap: 10px;
+  }
+  h2 .n { font-family: var(--mono); font-size: 12px; color: var(--faint); font-weight: 400; }
+  .sub { color: var(--dim); font-size: 14px; margin: 0 0 18px; max-width: 70ch; }
+
+  .note {
+    font-size: 13px; color: var(--dim); background: var(--sunk);
+    border-left: 3px solid var(--accent); border-radius: 0 8px 8px 0;
+    padding: 11px 15px; margin: 16px 0; max-width: 72ch;
+  }
+  .note strong { color: var(--ink); }
+
+  /* theme cards */
+  .themes { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(196px, 1fr)); }
+  .theme {
+    border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--card);
+  }
+  .swatch { height: 96px; position: relative; display: grid; place-items: center; }
+  .swatch .chip {
+    font-family: var(--mono); font-size: 11px; font-weight: 500;
+    padding: 5px 14px; border-radius: 999px;
+  }
+  .theme .meta { padding: 11px 13px 13px; }
+  .theme .name { font-weight: 600; font-size: 14px; }
+  .theme .hex { font-family: var(--mono); font-size: 11px; color: var(--faint); }
+  .theme .why { font-size: 12.5px; color: var(--dim); margin-top: 6px; }
+
+  /* tile states */
+  .tiles { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+  .tilecard { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--card); }
+  .tile {
+    position: relative; aspect-ratio: 1; background: linear-gradient(140deg, #7d8b9e, #4d5a6d);
+  }
+  .tile.sel { box-shadow: inset 0 0 0 3px var(--accent); }
+  .tile .scrim {
+    position: absolute; inset: 0;
+    background: linear-gradient(180deg, rgba(4,6,10,.5), rgba(4,6,10,0) 36%, rgba(4,6,10,.64));
+  }
+  .box {
+    position: absolute; top: 8px; left: 8px; width: 17px; height: 17px;
+    border-radius: 5px; border: 1.5px solid rgba(255,255,255,.8); background: rgba(0,0,0,.3);
+  }
+  .tile.sel .box { background: var(--accent); border-color: var(--accent); }
+  .pill {
+    position: absolute; top: 8px; left: 33px; font-family: var(--mono); font-size: 10px;
+    padding: 2px 7px; border-radius: 999px; background: rgba(6,8,12,.62); color: #fff;
+  }
+  .eye {
+    position: absolute; top: 7px; right: 7px; width: 22px; height: 22px; border-radius: 999px;
+    background: rgba(6,8,12,.55); color: #fff; display: grid; place-items: center; font-size: 11px;
+  }
+  .foot {
+    position: absolute; left: 8px; right: 8px; bottom: 8px;
+    font-family: var(--mono); font-size: 10px; color: #eef2f8;
+  }
+  .bar { height: 3px; border-radius: 999px; background: rgba(255,255,255,.22); margin-top: 4px; }
+  .bar i { display: block; height: 100%; border-radius: 999px; background: var(--accent); }
+  .tick { position: absolute; left: 9px; bottom: 8px; color: var(--ok); font-size: 13px; }
+  .err { color: var(--bad); }
+  .tilecard .cap { font-family: var(--mono); font-size: 11px; color: var(--faint); padding: 8px 11px; border-top: 1px solid var(--hair); }
+
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+  th {
+    text-align: left; font-family: var(--mono); font-size: 10.5px; text-transform: uppercase;
+    letter-spacing: .1em; color: var(--faint); font-weight: 500;
+    padding: 8px 14px 8px 0; border-bottom: 1px solid var(--line);
+  }
+  td { padding: 10px 14px 10px 0; border-bottom: 1px solid var(--hair); vertical-align: top; color: var(--dim); }
+  td:first-child { color: var(--ink); font-weight: 500; }
+  td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .scroll { overflow-x: auto; }
+  code { font-family: var(--mono); font-size: 12px; background: var(--sunk); border: 1px solid var(--hair); border-radius: 4px; padding: 1px 5px; }
+  .good { color: var(--ok); font-weight: 500; }
+  .bad2 { color: var(--bad); font-weight: 500; }
+  ul.tight { margin: 8px 0 14px; padding-left: 20px; max-width: 72ch; }
+  ul.tight li { margin-bottom: 7px; color: var(--dim); }
+  ul.tight li strong { color: var(--ink); font-weight: 600; }
+</style>
+
+<div class="wrap">
+
+<h1>Everything that changed, and what it looks like</h1>
+<p class="lede">A gallery of the styling options and enhancements from this session. The palettes and component states below are recreated in plain CSS, because the real screens run on Ant Design and a published page cannot load it.</p>
+<div class="facts">
+  <span>antd 6.6.1</span>
+  <span>5 themes</span>
+  <span>151 backend tests</span>
+  <span>34 e2e tests</span>
+  <span>37 commits</span>
+</div>
+
+<h2><span class="n">01</span>Theme options</h2>
+<p class="sub">Five accents, each shipped as a real switcher in the app rather than a build time choice. The selection persists per browser.</p>
+
+<div class="themes">
+  <div class="theme">
+    <div class="swatch" style="background:#0a0c10"><span class="chip" style="background:#5b8cff;color:#fff">Download</span></div>
+    <div class="meta"><div class="name">Graphite</div><div class="hex">#5b8cff</div>
+      <div class="why">Neutral. The photography carries the colour.</div></div>
+  </div>
+  <div class="theme">
+    <div class="swatch" style="background:#0d0a0a"><span class="chip" style="background:#ff6b57;color:#1b0d09">Download</span></div>
+    <div class="meta"><div class="name">Coral</div><div class="hex">#ff6b57</div>
+      <div class="why">Warm and energetic, does not fight the images.</div></div>
+  </div>
+  <div class="theme">
+    <div class="swatch" style="background:#0a0b0d"><span class="chip" style="background:#ccff42;color:#12160a">Download</span></div>
+    <div class="meta"><div class="name">Lime</div><div class="hex">#ccff42</div>
+      <div class="why">Loudest. Reads current, competes with busy thumbnails.</div></div>
+  </div>
+  <div class="theme">
+    <div class="swatch" style="background:#0b0a10"><span class="chip" style="background:#8b7bff;color:#12102a">Download</span></div>
+    <div class="meta"><div class="name">Iris</div><div class="hex">#8b7bff</div>
+      <div class="why">Soft and social. Linear and Arc territory.</div></div>
+  </div>
+  <div class="theme">
+    <div class="swatch" style="background:#080d0c"><span class="chip" style="background:#2fd6b0;color:#04201a">Download</span></div>
+    <div class="meta"><div class="name">Sea</div><div class="hex">#2fd6b0</div>
+      <div class="why">Cool and calm. Easy over long sessions.</div></div>
+  </div>
+</div>
+
+<div class="note">
+  <strong>Why each theme declares its own text colour.</strong> antd puts white on the accent by default. That is fine on Graphite and Iris and fails contrast badly on Lime and Sea. Every theme carries an <code>onAccent</code> value, which is why the Lime and Sea buttons above use near black text.
+</div>
+
+<h2><span class="n">02</span>Tile states</h2>
+<p class="sub">Each state readable without hovering or opening anything. Colour carries meaning: neutral waiting, accent working, green done, red failed.</p>
+
+<div class="tiles">
+  <div class="tilecard">
+    <div class="tile"><div class="scrim"></div><span class="box"></span><span class="eye">⤢</span></div>
+    <div class="cap">idle, not cached</div>
+  </div>
+  <div class="tilecard">
+    <div class="tile"><div class="scrim"></div><span class="box"></span><span class="pill">3</span><span class="eye">⤢</span>
+      <div class="foot">queued<div class="bar"><i style="width:8%"></i></div></div></div>
+    <div class="cap">queued</div>
+  </div>
+  <div class="tilecard">
+    <div class="tile"><div class="scrim"></div><span class="box"></span><span class="pill">3</span><span class="eye">⤢</span>
+      <div class="foot">fetching<div class="bar"><i style="width:62%"></i></div></div></div>
+    <div class="cap">fetching</div>
+  </div>
+  <div class="tilecard">
+    <div class="tile sel"><div class="scrim"></div><span class="box"></span><span class="eye">⤢</span><span class="tick">●</span></div>
+    <div class="cap">cached and selected</div>
+  </div>
+  <div class="tilecard">
+    <div class="tile"><div class="scrim"></div><span class="box"></span><span class="eye">⤢</span>
+      <div class="foot err">connection reset ↻</div></div>
+    <div class="cap">failed, reason and retry in place</div>
+  </div>
+</div>
+
+<h2><span class="n">03</span>Polling limits</h2>
+<p class="sub">The shared shell added pollers to every route, so this got measured rather than assumed.</p>
+<div class="scroll">
+<table>
+  <tr><th>Poller</th><th>Was</th><th>Now</th></tr>
+  <tr><td>Tracked profiles</td><td class="num">10s</td><td class="num">30s</td></tr>
+  <tr><td>Status and breaker</td><td class="num">5s</td><td class="num">5s</td></tr>
+  <tr><td>Profile metadata</td><td class="num">4s</td><td class="num">10s</td></tr>
+  <tr><td>Media grid</td><td class="num">4s</td><td class="num">4s</td></tr>
+  <tr><td><strong>Visible tab total</strong></td><td class="num bad2">0.80 req/s</td><td class="num good">0.58 req/s</td></tr>
+  <tr><td><strong>Hidden tab total</strong></td><td class="num bad2">0.80 req/s</td><td class="num good">0.00 req/s</td></tr>
+</table>
+</div>
+<div class="note">
+  None of this touches Instagram. Polling only reads SQLite. Instagram traffic is gated by the single worker thread and the pacer, and <code>ensure</code> is idempotent: forty polls over four items produced exactly four jobs.
+</div>
+
+<h2><span class="n">04</span>Enhancements shipped</h2>
+<ul class="tight">
+  <li><strong>Three pane layout.</strong> Profile rail with lookup and tracked accounts, contact sheet grid with the newest post featured at double size, inspector carrying metadata and the download form.</li>
+  <li><strong>Theme switcher.</strong> Five accents plus light and dark, persisted to the browser.</li>
+  <li><strong>Density toggle.</strong> Comfortable and compact grid sizes.</li>
+  <li><strong>Queue drawer.</strong> The worker queue was in the API from day one and had never been shown.</li>
+  <li><strong>Manual refresh.</strong> A refresh control in the header, so freshness is not purely a timer.</li>
+  <li><strong>Skeletons.</strong> Grid shaped placeholders instead of the word "Loading".</li>
+  <li><strong>Breaker banner in the shell.</strong> Visible on every screen rather than only where the old component was mounted.</li>
+</ul>
+
+<h2><span class="n">05</span>Bugs found by looking</h2>
+<p class="sub">Every one of these was found by running the interface, not by reading it. None were caught by a green unit suite.</p>
+<div class="scroll">
+<table>
+  <tr><th>Defect</th><th>Why it mattered</th></tr>
+  <tr><td>Single selection had no download form</td><td>You could only download two or more posts. The most basic action was missing.</td></tr>
+  <tr><td>Lookup button was <code>display: none</code></td><td>Reachable only by pressing Enter. Invisible to mouse and assistive tech.</td></tr>
+  <tr><td>Saved selections inside the selection block</td><td>Clearing the selection made them unreachable, so a saved set could never be loaded back.</td></tr>
+  <tr><td>Preview and checkbox only existed on hover</td><td>Unreachable by keyboard or touch. An element that is not in the DOM cannot be focused.</td></tr>
+  <tr><td>Hidden tab never fetched at all</td><td>My own visibility optimisation skipped the first fetch, so a background tab rendered a half populated screen.</td></tr>
+  <tr><td><code>opacity: 0</code> control still took clicks</td><td>Every tile had an invisible button swallowing clicks meant for its neighbour.</td></tr>
+  <tr><td>Grid capped at 120 posts</td><td>"Load more" kept indexing, but anything past the newest 120 was invisible.</td></tr>
+  <tr><td>e2e script deleted its data before killing servers</td><td>A stale API holding the SQLite file aborted every run under <code>set -e</code>.</td></tr>
+</table>
+</div>
+
+<h2><span class="n">06</span>Still not done</h2>
+<div class="scroll">
+<table>
+  <tr><th>Item</th><th>State</th></tr>
+  <tr><td>Real Instagram posts</td><td><span class="bad2">Blocked.</span> Nothing has ever been fetched. The production database is empty and no session file exists. Needs a dedicated account and one login run.</td></tr>
+  <tr><td>Lightbox fetch does not swap to full quality</td><td><span class="bad2">Unexplained.</span> The API is proven fine: <code>ensure</code> queues and the list reports ready on the next poll. The cause is in React. A spinner currently hides the symptom.</td></tr>
+</table>
+</div>
+
+</div>
