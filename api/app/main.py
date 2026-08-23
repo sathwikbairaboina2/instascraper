@@ -1,3 +1,4 @@
+import json
 import logging
 from contextlib import asynccontextmanager
 
@@ -36,7 +37,9 @@ def create_app(
         for directory in (settings.media_dir, settings.session_dir, settings.out_dir):
             directory.mkdir(parents=True, exist_ok=True)
         result = sweep.sweep(conn, settings.media_dir)
-        logging.info('{"event":"sweep","result":%s}', result)
+        # json.dumps, not %s: a dict interpolated into a string emits Python
+        # repr with single quotes, which is not parseable JSON.
+        logging.info(json.dumps({"event": "sweep", **result}))
 
         if start_worker:
             worker = Worker(
