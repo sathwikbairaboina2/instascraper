@@ -1,0 +1,26 @@
+services:
+  api:
+    build: ./api
+    env_file: .env
+    environment:
+      DB_PATH: /data/app.db
+      MEDIA_DIR: /data/media
+      SESSION_DIR: /data/session
+      OUT_DIR_CONTAINER: /out
+    volumes:
+      - ./data:/data
+      - ${OUT_DIR:-./downloads}:/out
+    restart: unless-stopped
+
+  web:
+    build: ./web
+    environment:
+      API_ORIGIN: http://api:8000
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./web:/srv
+      - /srv/node_modules
+    depends_on:
+      - api
+    restart: unless-stopped
