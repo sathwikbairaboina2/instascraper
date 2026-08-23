@@ -1,0 +1,165 @@
+from app import paths
+from app.clock import now_iso
+from app.ig import types as t
+from app.worker.runner import HandlerContext
+
+
+def handle_profile_sync(ctx: HandlerContext, payload: dict) -> None:
+    username = payload["username"]
+
+    ctx.pacer.wait()
+    profile = ctx.adapter.fetch_profile(username)
+
+    ctx.conn.execute(
+        "INSERT INTO profiles (username, ig_user_id, full_name, biography,"
+        " is_private, post_count, created_at)"
+        " VALUES (?,?,?,?,?,?,?)"
+        " ON CONFLICT(username) DO UPDATE SET"
+        " ig_user_id=excluded.ig_user_id, full_name=excluded.full_name,"
+        " biography=excluded.biography, is_private=excluded.is_private,"
+        " post_count=excluded.post_count",
+        (
+            profile.username,
+            profile.user_id,
+            profile.full_name,
+            profile.biography,
+            int(profile.is_private),
+            profile.post_count,
+            now_iso(),
+        ),
+    )
+
+    if profile.is_private:
+        raise t.IgPrivate(f"{username} is private")
+
+    avatar_dest = ctx.settings.media_dir / username / "avatar.jpg"
+    ctx.pacer.wait()
+    ctx.adapter.download_to(profile.avatar_url, avatar_dest)
+
+    ctx.conn.execute(
+        "UPDATE profiles SET avatar_path=?, last_synced_at=? WHERE username=?",
+        (paths.rel_path(ctx.settings.media_dir, avatar_dest), now_iso(), username),
+    )
+
+    row = ctx.conn.execute(
+        "SELECT next_cursor FROM profiles WHERE username=?", (username,)
+    ).fetchone()
+    if row["next_cursor"] is None:
+        ctx.enqueue("page_fetch", {"username": username})
+
+
+def handle_page_fetch(ctx: HandlerContext, payload: dict) -> None:
+    username = payload["username"]
+    row = ctx.conn.execute(
+        "SELECT next_cursor FROM profiles WHERE username=?", (username,)
+    ).fetchone()
+    if row is None:
+        raise t.IgNotFound(f"{username} has not been synced")
+
+    cursor = row["next_cursor"]
+    if cursor == "":
+        return  # exhausted; never hit Instagram again for this profile
+
+    ctx.pacer.wait()
+    page = ctx.adapter.fetch_page(username, cursor, ctx.settings.page_size)
+
+    for post in page.posts:
+        ctx.conn.execute(
+            "INSERT INTO media_items (shortcode, username, kind, taken_at, caption,"
+            " is_video, child_count, ig_url, discovered_at)"
+            " VALUES (?,?,?,?,?,?,?,?,?)"
+            " ON CONFLICT(shortcode) DO UPDATE SET"
+            " caption=excluded.caption, child_count=excluded.child_count",
+            (
+                post.shortcode,
+                username,
+                post.kind,
+                post.taken_at_iso,
+                post.caption,
+                int(post.is_video),
+                post.child_count,
+                post.ig_url,
+                now_iso(),
+            ),
+        )
+
+        thumb_dest = paths.item_dir(ctx.settings.media_dir, username, post.shortcode) / "thumb.jpg"
+        if not thumb_dest.exists():
+            ctx.pacer.wait()
+            saved = ctx.adapter.download_to(post.thumb_url, thumb_dest)
+            ctx.conn.execute(
+                "INSERT INTO media_files (shortcode, role, child_idx, path, mime, bytes,"
+                " width, height) VALUES (?,'thumb',0,?,?,?,?,?)"
+                " ON CONFLICT(shortcode, role, child_idx) DO UPDATE SET"
+                " path=excluded.path, bytes=excluded.bytes",
+                (
+                    post.shortcode,
+                    paths.rel_path(ctx.settings.media_dir, thumb_dest),
+                    saved.mime,
+                    saved.bytes,
+                    saved.width,
+                    saved.height,
+                ),
+            )
+
+    ctx.conn.execute(
+        "UPDATE profiles SET next_cursor=? WHERE username=?",
+        ("" if page.next_cursor is None else page.next_cursor, username),
+    )
+
+
+def handle_media_fetch(ctx: HandlerContext, payload: dict) -> None:
+    shortcode = payload["shortcode"]
+    item = ctx.conn.execute(
+        "SELECT * FROM media_items WHERE shortcode=?", (shortcode,)
+    ).fetchone()
+    if item is None:
+        raise t.IgNotFound(f"unknown shortcode {shortcode}")
+    if item["full_status"] == "ready":
+        return
+
+    ctx.conn.execute(
+        "UPDATE media_items SET full_status='fetching', full_error=NULL WHERE shortcode=?",
+        (shortcode,),
+    )
+
+    dest_dir = paths.item_dir(ctx.settings.media_dir, item["username"], shortcode)
+    try:
+        ctx.pacer.wait()
+        saved_files = ctx.adapter.fetch_media(shortcode, dest_dir)
+    except t.IgError as exc:
+        ctx.conn.execute(
+            "UPDATE media_items SET full_status='failed', full_error=? WHERE shortcode=?",
+            (str(exc), shortcode),
+        )
+        raise
+
+    for saved in saved_files:
+        ctx.conn.execute(
+            "INSERT INTO media_files (shortcode, role, child_idx, path, mime, bytes,"
+            " width, height) VALUES (?,'full',?,?,?,?,?,?)"
+            " ON CONFLICT(shortcode, role, child_idx) DO UPDATE SET"
+            " path=excluded.path, mime=excluded.mime, bytes=excluded.bytes,"
+            " width=excluded.width, height=excluded.height",
+            (
+                shortcode,
+                saved.child_idx,
+                paths.rel_path(ctx.settings.media_dir, saved.path),
+                saved.mime,
+                saved.bytes,
+                saved.width,
+                saved.height,
+            ),
+        )
+
+    ctx.conn.execute(
+        "UPDATE media_items SET full_status='ready', full_error=NULL WHERE shortcode=?",
+        (shortcode,),
+    )
+
+
+HANDLERS = {
+    "profile_sync": handle_profile_sync,
+    "page_fetch": handle_page_fetch,
+    "media_fetch": handle_media_fetch,
+}
