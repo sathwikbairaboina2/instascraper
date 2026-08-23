@@ -2,7 +2,8 @@ import { expect, test } from '@playwright/test'
 
 test('grid renders seeded tiles newest first', async ({ page }) => {
   await page.goto('/p/nike')
-  await expect(page.getByTestId('media-grid').locator('button')).toHaveCount(8)
+  // .tile, not every button: each tile now also carries a preview control.
+  await expect(page.getByTestId('media-grid').locator('.tile')).toHaveCount(8)
 })
 
 test('clicking a tile selects it', async ({ page }) => {

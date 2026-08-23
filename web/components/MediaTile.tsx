@@ -20,11 +20,13 @@ export default function MediaTile({
   selected,
   onToggle,
   onRetry,
+  onPreview,
 }: {
   item: MediaSummary
   selected: boolean
   onToggle: (shiftKey: boolean) => void
   onRetry: () => void
+  onPreview: () => void
 }) {
   const badge = item.kind === 'carousel' ? String(item.child_count) : BADGE[item.kind]
   const failed = item.full_status === 'failed'
@@ -48,6 +50,17 @@ export default function MediaTile({
         )}
         {item.full_status === 'queued' && <span className="badge badge-br">queued</span>}
         {item.full_status === 'fetching' && <span className="badge badge-br">fetching</span>}
+      </button>
+
+      <button
+        type="button"
+        className="tile-preview"
+        data-testid={`preview-${item.shortcode}`}
+        aria-label={`Preview ${item.shortcode}`}
+        title="Preview"
+        onClick={onPreview}
+      >
+        ⤢
       </button>
 
       {failed && (

@@ -21,6 +21,9 @@ services:
     volumes:
       - ./web:/srv
       - /srv/node_modules
+      # .next must not be shared with the host: a native `next dev` and the
+      # container's would write the same build directory and fight over it.
+      - /srv/.next
     depends_on:
       - api
     restart: unless-stopped

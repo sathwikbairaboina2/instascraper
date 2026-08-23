@@ -48,6 +48,7 @@ main { padding: 1.25rem; }
 
 .tile {
   position: relative;
+  width: 100%;
   aspect-ratio: 1 / 1;
   border: 2px solid transparent;
   padding: 0;
@@ -59,7 +60,7 @@ main { padding: 1.25rem; }
 .tile img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .tile[aria-pressed='true'] { border-color: var(--accent); }
 
-.tile-wrap { position: relative; }
+.tile-wrap { position: relative; display: block; min-width: 0; }
 
 .tile-failed {
   position: absolute;
@@ -124,3 +125,145 @@ main { padding: 1.25rem; }
 table { border-collapse: collapse; width: 100%; }
 th, td { text-align: left; padding: 0.4rem 0.7rem; border-bottom: 1px solid var(--line); }
 .muted { color: var(--muted); }
+
+/* Always rendered and always clickable. An opacity:0 control still receives
+   pointer events, so hiding it that way put an invisible button over the
+   neighbouring tile and swallowed clicks meant for it. */
+.tile-preview {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  font: 12px/1 var(--mono, monospace);
+  color: #fff;
+  background: rgba(0, 0, 0, 0.55);
+  border: 0;
+  border-radius: 4px;
+  padding: 3px 6px;
+  cursor: pointer;
+  opacity: 0.35;
+  transition: opacity 120ms;
+}
+
+.tile-wrap:hover .tile-preview,
+.tile-preview:hover,
+.tile-preview:focus-visible { opacity: 1; }
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 0;
+}
+
+.filters select,
+.filters input[type='text'],
+.filters input:not([type]) {
+  padding: 4px 8px;
+  background: #17171d;
+  color: inherit;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+.check { display: flex; align-items: center; gap: 6px; }
+
+.saved-chip {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.saved-chip button {
+  background: none;
+  border: 0;
+  color: inherit;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+.saved-chip button:last-child { border-left: 1px solid var(--line); padding: 3px 8px; }
+.saved-chip button:hover { background: rgba(255, 255, 255, 0.08); }
+
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.82);
+}
+
+.lightbox-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: min(1100px, 100%);
+  max-height: 100%;
+}
+
+.lightbox-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #fff;
+  font-size: 13px;
+}
+.lightbox-title { flex: 1; font-family: var(--mono, monospace); }
+.lightbox-bar a { color: #9fc0ff; }
+.lightbox-bar button {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 6px;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+
+.lightbox-stage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+}
+.lightbox-stage img,
+.lightbox-stage video {
+  max-width: 100%;
+  max-height: 78vh;
+  display: block;
+  background: #000;
+}
+
+.lightbox-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  color: #ddd;
+  text-align: center;
+}
+.lightbox-placeholder img { max-height: 50vh; opacity: 0.55; }
+.lightbox-placeholder button {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 6px;
+  padding: 5px 12px;
+  cursor: pointer;
+}
+
+.lightbox-nav { display: flex; gap: 10px; justify-content: center; }
+.lightbox-nav button {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 6px;
+  padding: 4px 14px;
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tile-preview { transition: none; }
+}

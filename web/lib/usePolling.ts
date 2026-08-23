@@ -8,9 +8,19 @@ export function usePolling<T>(fn: () => Promise<T>, intervalMs: number, enabled 
   const fnRef = useRef(fn)
   fnRef.current = fn
 
+  const lastJson = useRef<string | null>(null)
+
   const refresh = useCallback(async () => {
     try {
-      setData(await fnRef.current())
+      const next = await fnRef.current()
+      // Only swap state when the payload actually changed. Replacing an
+      // identical object every 4s re-renders the whole grid and churns the
+      // identities selection and filtering are derived from.
+      const json = JSON.stringify(next)
+      if (json !== lastJson.current) {
+        lastJson.current = json
+        setData(next)
+      }
       setError(null)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
