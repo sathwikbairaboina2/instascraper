@@ -42,7 +42,6 @@ export function usePolling<T>(fn: () => Promise<T>, intervalMs: number, enabled 
 
     const start = () => {
       if (id !== null) return
-      void tick()
       id = setInterval(tick, intervalMs)
     }
 
@@ -54,18 +53,21 @@ export function usePolling<T>(fn: () => Promise<T>, intervalMs: number, enabled 
 
     const onVisibility = () => {
       if (typeof document === 'undefined') return
-      if (document.hidden) stop()
-      else start()
+      if (document.hidden) {
+        stop()
+      } else {
+        void tick()
+        start()
+      }
     }
 
-    if (typeof document !== 'undefined' && document.hidden) {
-      // Do not start a timer for a tab nobody is looking at.
+    // Always fetch once, even if the tab starts hidden: otherwise a screen
+    // opened in a background tab renders empty forever and only fills in if a
+    // visibilitychange happens to fire. Only the repeating timer is gated.
+    void tick()
+    if (typeof document === 'undefined' || !document.hidden) start()
+    if (typeof document !== 'undefined') {
       document.addEventListener('visibilitychange', onVisibility)
-    } else {
-      start()
-      if (typeof document !== 'undefined') {
-        document.addEventListener('visibilitychange', onVisibility)
-      }
     }
 
     return () => {
