@@ -15,12 +15,24 @@ class Settings:
     ig_min_interval: float
     ig_backoff: int
     adapter: str
+    anonymous: bool
+    max_sleep: float
+
+
+def _truthy(value: str) -> bool:
+    return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
 def load_settings() -> Settings:
+    username = os.environ.get("IG_USERNAME", "")
+    password = os.environ.get("IG_PASSWORD", "")
+    # No credentials means anonymous rather than broken: the app still runs and
+    # reports what Instagram says. IG_ANONYMOUS forces it even when set.
+    anonymous = _truthy(os.environ.get("IG_ANONYMOUS", "")) or not (username and password)
+
     return Settings(
-        ig_username=os.environ.get("IG_USERNAME", ""),
-        ig_password=os.environ.get("IG_PASSWORD", ""),
+        ig_username=username,
+        ig_password=password,
         db_path=Path(os.environ.get("DB_PATH", "/data/app.db")),
         media_dir=Path(os.environ.get("MEDIA_DIR", "/data/media")),
         session_dir=Path(os.environ.get("SESSION_DIR", "/data/session")),
@@ -29,4 +41,6 @@ def load_settings() -> Settings:
         ig_min_interval=float(os.environ.get("IG_MIN_INTERVAL", "3")),
         ig_backoff=int(os.environ.get("IG_BACKOFF", "900")),
         adapter=os.environ.get("IG_ADAPTER", "real"),
+        anonymous=anonymous,
+        max_sleep=float(os.environ.get("IG_MAX_SLEEP", "60")),
     )

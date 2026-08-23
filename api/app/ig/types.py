@@ -16,7 +16,15 @@ class IgPrivate(IgError):
 
 
 class IgRateLimited(IgError):
-    """429 or equivalent. Trips the breaker temporarily."""
+    """429 or equivalent. Trips the breaker temporarily.
+
+    `retry_after` is how long Instagram asked us to wait. Honour it: coming
+    back sooner than requested is what turns a rate limit into a blocked IP.
+    """
+
+    def __init__(self, message: str, retry_after: float | None = None):
+        super().__init__(message)
+        self.retry_after = retry_after
 
 
 class IgChallenge(IgError):

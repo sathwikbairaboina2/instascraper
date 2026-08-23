@@ -102,8 +102,19 @@ class Worker(threading.Thread):
         try:
             handler(ctx, payload)
         except t.IgRateLimited as exc:
-            self.breaker.trip_temporary(self.settings.ig_backoff, f"Rate limited: {exc}")
             queue.requeue(conn, job["id"])
+            if self.settings.anonymous:
+                # Waiting cannot fix an anonymous refusal -- Instagram declines
+                # unauthenticated reads outright. Retrying on a timer would just
+                # keep hitting them, which is how an IP gets blocked.
+                self.breaker.trip_permanent(
+                    "Instagram is refusing anonymous access; a dedicated account is required"
+                )
+                self._log(job, payload, started, "anonymous_refused")
+                return
+            # IG_BACKOFF is a floor, never a licence to return sooner than asked.
+            wait = max(self.settings.ig_backoff, exc.retry_after or 0)
+            self.breaker.trip_temporary(wait, f"Rate limited: {exc}")
             self._log(job, payload, started, "rate_limited")
             return
         except t.IgChallenge as exc:

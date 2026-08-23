@@ -19,6 +19,11 @@ def classify(exc: Exception) -> t.IgError:
     When Instagram rotates something, this is usually the first function
     that needs updating.
     """
+    # Our own errors already carry the right classification (and, for a rate
+    # limit, the wait Instagram asked for). Never re-wrap them.
+    if isinstance(exc, t.IgError):
+        return exc
+
     message = str(exc)
     if isinstance(
         exc,
@@ -93,13 +98,19 @@ class InstaloaderAdapter:
             download_comments=False,
             save_metadata=False,
             compress_json=False,
-            rate_controller=lambda ctx: PacedRateController(ctx, settings.ig_min_interval),
+            rate_controller=lambda ctx: PacedRateController(
+                ctx, settings.ig_min_interval, settings.max_sleep
+            ),
         )
         self._session_file = settings.session_dir / f"{settings.ig_username}.session"
         self._logged_in = False
 
     # ---- session -------------------------------------------------------
     def login(self) -> None:
+        if self._settings.anonymous:
+            raise t.IgChallenge(
+                "Running in anonymous mode; set IG_USERNAME and IG_PASSWORD to log in."
+            )
         try:
             if self._session_file.exists():
                 self._loader.load_session_from_file(
@@ -114,6 +125,9 @@ class InstaloaderAdapter:
             raise classify(exc) from exc
 
     def _ensure_login(self) -> None:
+        # Anonymous mode is a supported configuration, not a missing setup step.
+        if self._settings.anonymous:
+            return
         if not self._logged_in:
             self.login()
 

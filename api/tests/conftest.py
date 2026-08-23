@@ -22,6 +22,8 @@ def settings(tmp_path: Path) -> Settings:
         ig_min_interval=0.05,
         ig_backoff=2,
         adapter="fake",
+        anonymous=True,
+        max_sleep=60,
     )
 
 

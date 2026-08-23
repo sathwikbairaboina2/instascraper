@@ -75,7 +75,10 @@ def test_media_fetch_preempts_queued_page_fetches(worker_env):
 
 def test_rate_limit_trips_breaker_requeues_job_and_resumes(worker_env):
     settings, conn, adapter, breaker, pacer = worker_env
-    settings = settings.__class__(**{**settings.__dict__, "ig_backoff": 1})
+    # authenticated path: an anonymous refusal is terminal, not a nap
+    settings = settings.__class__(
+        **{**settings.__dict__, "ig_backoff": 1, "anonymous": False}
+    )
     attempts = []
 
     def handler(ctx, payload):
