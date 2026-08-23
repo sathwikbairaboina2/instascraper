@@ -1,0 +1,12 @@
+{
+  "shortcode": "CxVideo01",
+  "__typename": "GraphVideo",
+  "product_type": "clips",
+  "taken_at_timestamp": 1767312000,
+  "is_video": true,
+  "video_url": "https://cdn.test/CxVideo01/full.mp4",
+  "display_url": "https://cdn.test/CxVideo01/cover.jpg",
+  "thumbnail_src": "https://cdn.test/CxVideo01/thumb.jpg",
+  "dimensions": {"width": 1080, "height": 1920},
+  "edge_media_to_caption": {"edges": []}
+}

@@ -1,0 +1,16 @@
+{
+  "shortcode": "CxCarousel1",
+  "__typename": "GraphSidecar",
+  "taken_at_timestamp": 1767398400,
+  "is_video": false,
+  "thumbnail_src": "https://cdn.test/CxCarousel1/thumb.jpg",
+  "dimensions": {"width": 1080, "height": 1080},
+  "edge_media_to_caption": {"edges": [{"node": {"text": "three slides"}}]},
+  "edge_sidecar_to_children": {
+    "edges": [
+      {"node": {"is_video": false, "display_url": "https://cdn.test/c/1.jpg", "dimensions": {"width": 1080, "height": 1080}}},
+      {"node": {"is_video": false, "display_url": "https://cdn.test/c/2.jpg", "dimensions": {"width": 1080, "height": 1080}}},
+      {"node": {"is_video": true, "video_url": "https://cdn.test/c/3.mp4", "dimensions": {"width": 1080, "height": 1920}}}
+    ]
+  }
+}

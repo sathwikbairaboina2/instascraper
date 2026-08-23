@@ -1,0 +1,10 @@
+{
+  "shortcode": "CxImage01",
+  "__typename": "GraphImage",
+  "taken_at_timestamp": 1767225600,
+  "is_video": false,
+  "display_url": "https://cdn.test/CxImage01/full.jpg",
+  "thumbnail_src": "https://cdn.test/CxImage01/thumb.jpg",
+  "dimensions": {"width": 1080, "height": 1350},
+  "edge_media_to_caption": {"edges": [{"node": {"text": "a caption"}}]}
+}
