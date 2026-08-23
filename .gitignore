@@ -10,3 +10,6 @@ node_modules/
 .next/
 test-results/
 playwright-report/
+
+# transient test log
+.e2e-run.log
