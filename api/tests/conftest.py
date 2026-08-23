@@ -34,3 +34,25 @@ def conn(settings):
     yield c
     c.close()
     db.reset_thread_state()
+
+
+@pytest.fixture
+def adapter():
+    from app.ig.fake import FakeAdapter
+
+    fake = FakeAdapter()
+    fake.add_profile("nike", post_count=10)
+    fake.add_posts("nike", count=10)
+    return fake
+
+
+@pytest.fixture
+def client(settings, conn, adapter):
+    from fastapi.testclient import TestClient
+
+    from app.main import create_app
+
+    app = create_app(settings=settings, adapter=adapter, start_worker=False)
+    with TestClient(app) as c:
+        c.app_state = app.state  # type: ignore[attr-defined]
+        yield c
