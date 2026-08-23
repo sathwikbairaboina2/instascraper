@@ -7,6 +7,7 @@ from app import db
 from app.config import Settings, load_settings
 from app.ig.adapter import make_adapter
 from app.routes import activity as activity_routes
+from app.routes import downloads as download_routes
 from app.routes import media as media_routes
 from app.routes import profiles as profile_routes
 from app.routes import status as status_routes
@@ -62,6 +63,7 @@ def create_app(
     app.include_router(activity_routes.router, prefix="/api")
     app.include_router(profile_routes.router, prefix="/api")
     app.include_router(media_routes.router, prefix="/api")
+    app.include_router(download_routes.router, prefix="/api")
     return app
 
 
