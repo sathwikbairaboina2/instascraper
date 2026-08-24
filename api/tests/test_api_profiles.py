@@ -119,3 +119,12 @@ def test_clear_cache_removes_files_and_resets_status(client, conn, settings, ada
     }
     assert statuses == {"none"}
     assert conn.execute("SELECT COUNT(*) c FROM media_files").fetchone()["c"] == 0
+
+
+def test_profile_detail_reports_the_follower_count(client, conn, settings, adapter):
+    seed(client, conn, settings, adapter)
+    conn.execute("UPDATE profiles SET followers_count=99 WHERE username='nike'")
+
+    body = client.get("/api/profiles/nike").json()
+
+    assert body["followers_count"] == 99

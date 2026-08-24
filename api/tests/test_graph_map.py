@@ -141,3 +141,13 @@ def test_a_missing_product_type_falls_back_to_the_media_type():
         "timestamp": "2026-08-20T14:03:11+0000",
     }
     assert graph_map.post_from_node(node).kind == "image"
+
+
+def test_profile_carries_the_follower_count():
+    profile = graph_map.profile_from_payload(load("profile.json"))
+    assert profile.followers_count == 291399778
+
+
+def test_a_profile_without_a_follower_count_maps_to_zero():
+    payload = {"business_discovery": {"username": "x", "id": "1", "media_count": 0}}
+    assert graph_map.profile_from_payload(payload).followers_count == 0

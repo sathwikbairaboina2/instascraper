@@ -14,12 +14,13 @@ def handle_profile_sync(ctx: HandlerContext, payload: dict) -> None:
 
     ctx.conn.execute(
         "INSERT INTO profiles (username, ig_user_id, full_name, biography,"
-        " is_private, post_count, created_at)"
-        " VALUES (?,?,?,?,?,?,?)"
+        " is_private, post_count, followers_count, created_at)"
+        " VALUES (?,?,?,?,?,?,?,?)"
         " ON CONFLICT(username) DO UPDATE SET"
         " ig_user_id=excluded.ig_user_id, full_name=excluded.full_name,"
         " biography=excluded.biography, is_private=excluded.is_private,"
-        " post_count=excluded.post_count",
+        " post_count=excluded.post_count,"
+        " followers_count=excluded.followers_count",
         (
             profile.username,
             profile.user_id,
@@ -27,6 +28,7 @@ def handle_profile_sync(ctx: HandlerContext, payload: dict) -> None:
             profile.biography,
             int(profile.is_private),
             profile.post_count,
+            profile.followers_count,
             now_iso(),
         ),
     )

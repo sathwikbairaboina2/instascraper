@@ -32,6 +32,7 @@ def profile_from_payload(payload: dict) -> t.IgProfile:
         # accounts. A private one is an error, not a private-looking result.
         is_private=False,
         post_count=int(bd.get("media_count") or 0),
+        followers_count=int(bd.get("followers_count") or 0),
         avatar_url=bd.get("profile_picture_url") or "",
     )
 

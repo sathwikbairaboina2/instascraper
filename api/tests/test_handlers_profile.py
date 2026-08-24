@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 import pytest
 
 from app.ig import types as t
@@ -220,3 +222,17 @@ def test_page_fetch_persists_media_sources(ctx):
         }
     ]
     assert row["src_urls_at"]
+
+
+def test_profile_sync_stores_the_follower_count(ctx):
+    ctx.adapter.add_profile("nike", post_count=42)
+    ctx.adapter.profiles["nike"] = replace(
+        ctx.adapter.profiles["nike"], followers_count=1234
+    )
+
+    handlers.handle_profile_sync(ctx, {"username": "nike"})
+
+    row = ctx.conn.execute(
+        "SELECT followers_count FROM profiles WHERE username='nike'"
+    ).fetchone()
+    assert row["followers_count"] == 1234

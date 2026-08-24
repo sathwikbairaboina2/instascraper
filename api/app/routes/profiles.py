@@ -80,6 +80,7 @@ def get_profile(username: str, conn=Depends(get_conn_dep)):
         "biography": row["biography"],
         "is_private": bool(row["is_private"]),
         "post_count": row["post_count"],
+        "followers_count": row["followers_count"],
         "avatar_url": f"/api/profiles/{username}/avatar",
         "tracked": bool(row["tracked"]),
         "last_synced_at": row["last_synced_at"],

@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS profiles (
   biography       TEXT,
   is_private      INTEGER NOT NULL DEFAULT 0,
   post_count      INTEGER,
+  followers_count INTEGER,
   avatar_path     TEXT,
   next_cursor     TEXT,
   tracked         INTEGER NOT NULL DEFAULT 0,

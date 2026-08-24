@@ -44,6 +44,9 @@ class IgProfile:
     is_private: bool
     post_count: int
     avatar_url: str
+    # Business Discovery always returns this; the fake adapter and older
+    # recorded payloads do not, so it defaults rather than being required.
+    followers_count: int = 0
 
 
 @dataclass(frozen=True)
