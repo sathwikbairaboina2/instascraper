@@ -13,7 +13,6 @@ PY=.venv/Scripts/python.exe
 
 export DB_PATH=../.e2e/data/app.db
 export MEDIA_DIR=../.e2e/data/media
-export SESSION_DIR=../.e2e/data/session
 export OUT_DIR_CONTAINER=../.e2e/downloads
 export IG_ADAPTER=fake
 export PAGE_SIZE=36
