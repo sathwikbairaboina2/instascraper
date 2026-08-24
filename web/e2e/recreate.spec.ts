@@ -260,3 +260,35 @@ test('a prepared item moves to its own tab', async ({ page }) => {
   await page.getByTestId('recreate-tabs').getByText('Prepared 1', { exact: true }).click()
   await expect(page.getByTestId('recreate-row-nike-5')).toBeVisible()
 })
+
+test('picking a slide shows that slide, large', async ({ page }) => {
+  // Ticking a box you cannot check is not a choice. Clicking a cell has to
+  // both include the slide and put it on screen.
+  await page.goto('/p/nike')
+  await page.getByTestId('recreate-nike-6').click()
+  await expect(page.getByTestId('recreate-flag-nike-6')).toBeVisible()
+
+  await page.goto('/recreate/nike-6')
+  await page.getByTestId('slide-2').click()
+
+  await expect(page.getByTestId('focus-label')).toContainText('Slide 2 of 3')
+  // Clicking an included slide removes it, and you can still see what you
+  // just dropped.
+  await expect(page.getByTestId('focus-label')).toContainText('not included')
+  await expect(page.getByTestId('big-slide')).toHaveAttribute('src', /child=2/)
+
+  await page.getByTestId('slide-2').click()
+
+  await expect(page.getByTestId('focus-label')).toContainText('included')
+})
+
+test('a single post shows its cover and offers no slide label', async ({ page }) => {
+  await page.goto('/p/nike')
+  await page.getByTestId('recreate-nike-0').click()
+  await expect(page.getByTestId('recreate-flag-nike-0')).toBeVisible()
+
+  await page.goto('/recreate/nike-0')
+
+  await expect(page.getByTestId('big-slide')).toBeVisible()
+  await expect(page.getByTestId('focus-label')).toHaveCount(0)
+})

@@ -61,6 +61,47 @@ function SlideImage({
   )
 }
 
+/** The slide you are looking at, big enough to judge before committing to
+ *  it. Falls back to the post's cover when a slide cannot be shown -- an
+ *  expired source url, or a video child with no still. */
+function BigSlide({
+  shortcode,
+  child,
+  cached,
+  fallback,
+}: {
+  shortcode: string
+  child: number | null
+  cached: boolean
+  fallback?: string
+}) {
+  const { tokens } = useThemePref()
+  const [failed, setFailed] = useState<number | null>(null)
+
+  const usable = child !== null && failed !== child
+  const src = !usable
+    ? fallback
+    : cached
+      ? `/api/media/${shortcode}/full?child=${child}`
+      : `/api/media/${shortcode}/preview?child=${child}`
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt=""
+      data-testid="big-slide"
+      onError={() => setFailed(child)}
+      style={{
+        width: '100%',
+        borderRadius: 10,
+        display: 'block',
+        background: tokens.surface,
+      }}
+    />
+  )
+}
+
 export default function RecreateItemPage({
   params,
 }: {
@@ -75,6 +116,9 @@ export default function RecreateItemPage({
   const [phase, setPhase] = useState<Phase>('idle')
   const [failure, setFailure] = useState<string | null>(null)
   const [payload, setPayload] = useState<RecreatePayload | null>(null)
+  // Which slide the big picture is showing. Picking one should let you look
+  // at it, not just tick a box you cannot check.
+  const [focus, setFocus] = useState<number | null>(null)
 
   // The post itself is what says how many slides there are and whether the
   // files are already on disk. The recreate row is a snapshot and cannot.
@@ -170,12 +214,23 @@ export default function RecreateItemPage({
         </Link>
 
         <Flex gap={20} align="flex-start" wrap>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={item?.thumb_url}
-            alt=""
-            style={{ width: 240, borderRadius: 10, display: 'block', background: tokens.surface }}
-          />
+          <Flex vertical gap={7} style={{ width: 300, flex: 'none' }}>
+            <BigSlide
+              shortcode={shortcode}
+              child={focus}
+              cached={cached}
+              fallback={item?.thumb_url}
+            />
+            {isCarousel && focus !== null && (
+              <Text
+                data-testid="focus-label"
+                style={{ fontSize: 11.5, color: tokens.textSecondary }}
+              >
+                Slide {focus} of {source?.child_count ?? 0} ·{' '}
+                {chosen.includes(focus) ? 'included' : 'not included'}
+              </Text>
+            )}
+          </Flex>
 
           <Flex vertical gap={12} style={{ flex: 1, minWidth: 300 }}>
             <Flex align="center" gap={10}>
@@ -208,14 +263,15 @@ export default function RecreateItemPage({
                         role="checkbox"
                         aria-checked={on}
                         data-testid={`slide-${n}`}
-                        onClick={() =>
+                        onClick={() => {
+                          setFocus(n)
                           setSlides((prev) => {
                             const cur = prev ?? []
                             return cur.includes(n)
                               ? cur.filter((x) => x !== n)
                               : [...cur, n].sort((a, b) => a - b)
                           })
-                        }
+                        }}
                         style={{
                           cursor: 'pointer',
                           minWidth: 72,
