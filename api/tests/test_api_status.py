@@ -59,3 +59,59 @@ def test_injected_adapter_pins_the_runtime(settings):
     injected = FakeAdapter()
     app = create_app(settings=settings, adapter=injected, start_worker=False)
     assert app.state.runtime.current.adapter is injected
+
+
+def test_switching_changes_what_status_reports(client):
+    assert client.post("/api/adapter", json={"adapter": "graph"}).status_code == 200
+    assert client.get("/api/status").json()["adapter"] == "graph"
+
+
+def test_switching_is_idempotent(client):
+    body = client.post("/api/adapter", json={"adapter": "fake"}).json()
+    assert body["adapter"] == "fake"
+
+
+def test_unknown_adapter_is_rejected(client):
+    assert client.post("/api/adapter", json={"adapter": "instaloader"}).status_code == 400
+
+
+def test_switching_clears_the_breaker(client):
+    client.app_state.breaker.trip_permanent("Instagram token invalid: checkpoint")
+    assert client.app_state.breaker.state()["tripped"] is True
+
+    client.post("/api/adapter", json={"adapter": "graph"})
+
+    assert client.app_state.breaker.state()["tripped"] is False
+
+
+def test_switching_persists_the_selection(client, settings):
+    from app import runtime
+
+    client.post("/api/adapter", json={"adapter": "graph"})
+    assert runtime.read_selection(settings) == "graph"
+
+
+def test_fake_data_never_reaches_the_graph_root(settings):
+    """The isolation the whole feature exists for.
+
+    Built without an injected adapter, so paths are genuinely derived --
+    the `client` fixture injects one, which deliberately pins the runtime
+    to the base paths and would make this assertion vacuous.
+    """
+    from dataclasses import replace
+
+    from app import runtime
+    from app.main import create_app
+
+    base = replace(settings, adapter="fake", graph_token="", graph_user_id="")
+    app = create_app(settings=base, start_worker=False)
+
+    active = app.state.runtime.current.settings
+    assert active.db_path == base.db_path.parent / "fake" / base.db_path.name
+    assert active.media_dir == base.media_dir.parent / "fake" / base.media_dir.name
+    # The export folder is shared on purpose: it holds files the user named.
+    assert active.out_dir == base.out_dir
+
+    runtime.prepare_data_root(active)
+    assert active.db_path.exists()
+    assert not base.db_path.exists(), "fake wrote into the graph root"
