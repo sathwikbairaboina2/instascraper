@@ -17,6 +17,10 @@ _BASE = "https://graph.facebook.com"
 _PROFILE_FIELDS = (
     "id,ig_id,username,name,biography,followers_count,media_count,profile_picture_url"
 )
+_MEDIA_FIELDS = (
+    "id,caption,media_type,media_product_type,media_url,thumbnail_url,"
+    "permalink,timestamp,children{id,media_type,media_url,thumbnail_url}"
+)
 
 _CHALLENGE_CODES = {102, 190}
 _RATE_LIMIT_CODES = {4, 17, 32, 613}
@@ -155,3 +159,12 @@ class GraphAdapter:
     def fetch_profile(self, username: str) -> t.IgProfile:
         payload = self._get(f"business_discovery.username({username}){{{_PROFILE_FIELDS}}}")
         return graph_map.profile_from_payload(payload)
+
+    def fetch_page(self, username: str, cursor: str | None, limit: int) -> t.IgPage:
+        media = f"media.limit({limit})"
+        if cursor:
+            media += f".after({cursor})"
+        payload = self._get(
+            f"business_discovery.username({username}){{{media}{{{_MEDIA_FIELDS}}}}}"
+        )
+        return graph_map.page_from_payload(payload)

@@ -118,3 +118,38 @@ def test_missing_token_is_a_challenge_not_a_crash(settings):
     )
     with pytest.raises(t.IgChallenge):
         GraphAdapter(bare).login()
+
+
+def test_fetch_page_maps_posts_and_the_cursor(graph_settings):
+    transport = Transport((200, {}, load("media_page.json")))
+    page = GraphAdapter(graph_settings, transport=transport).fetch_page("nike", None, 3)
+
+    assert [p.shortcode for p in page.posts] == [
+        "AAAAAAAAAAA",
+        "BBBBBBBBBBB",
+        "CCCCCCCCCCC",
+    ]
+    assert page.next_cursor == "CURSOR_AFTER_1"
+
+
+def test_first_page_requests_a_limit_and_no_after(graph_settings):
+    transport = Transport((200, {}, load("media_page.json")))
+    GraphAdapter(graph_settings, transport=transport).fetch_page("nike", None, 3)
+
+    url = transport.urls[0]
+    assert "media.limit(3)" in url
+    assert "after(" not in url
+
+
+def test_later_page_threads_the_cursor_into_after(graph_settings):
+    transport = Transport((200, {}, load("media_page.json")))
+    GraphAdapter(graph_settings, transport=transport).fetch_page("nike", "CURSOR_AFTER_1", 36)
+
+    url = transport.urls[0]
+    assert "media.limit(36).after(CURSOR_AFTER_1)" in url
+
+
+def test_exhausted_page_reports_no_cursor(graph_settings):
+    transport = Transport((200, {}, load("media_last_page.json")))
+    page = GraphAdapter(graph_settings, transport=transport).fetch_page("nike", "c", 36)
+    assert page.next_cursor is None
