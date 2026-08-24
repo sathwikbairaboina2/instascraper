@@ -100,3 +100,42 @@ def test_seeded_adapter_is_shared_by_make_adapter(settings):
     # every seeded shortcode must be fetchable
     for post in canonical.posts["nike"]:
         assert served._find_post(post.shortcode).shortcode == post.shortcode
+
+
+def test_igpost_carries_media_sources():
+    src = t.MediaSource(child_idx=0, url="https://cdn/x.jpg", mime="image/jpeg", is_video=False)
+    post = t.IgPost(
+        shortcode="abc",
+        kind="image",
+        taken_at_iso="2026-01-01T00:00:00+00:00",
+        caption="",
+        is_video=False,
+        child_count=1,
+        thumb_url="https://cdn/t.jpg",
+        ig_url="https://instagram.com/p/abc/",
+        sources=(src,),
+    )
+    assert post.sources[0].url == "https://cdn/x.jpg"
+
+
+def test_igpost_sources_default_to_empty():
+    post = t.IgPost(
+        shortcode="abc",
+        kind="image",
+        taken_at_iso="2026-01-01T00:00:00+00:00",
+        caption="",
+        is_video=False,
+        child_count=1,
+        thumb_url="https://cdn/t.jpg",
+        ig_url="https://instagram.com/p/abc/",
+    )
+    assert post.sources == ()
+
+
+def test_fake_fetch_media_accepts_and_ignores_a_hint(tmp_path):
+    fake = FakeAdapter()
+    fake.add_profile("nike")
+    fake.add_posts("nike", count=1)
+    hint = t.MediaHint(username="nike", sources=(), captured_at="2026-01-01T00:00:00+00:00")
+    saved = fake.fetch_media("nike-0", tmp_path, hint)
+    assert [s.child_idx for s in saved] == [0]

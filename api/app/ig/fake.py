@@ -137,7 +137,9 @@ class FakeAdapter:
         finally:
             self._exit("fetch_page", started)
 
-    def fetch_media(self, shortcode: str, dest_dir: Path) -> list[t.SavedFile]:
+    def fetch_media(
+        self, shortcode: str, dest_dir: Path, hint: t.MediaHint | None = None
+    ) -> list[t.SavedFile]:
         started = self._enter("fetch_media")
         try:
             post = self._find_post(shortcode)

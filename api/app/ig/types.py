@@ -47,6 +47,34 @@ class IgProfile:
 
 
 @dataclass(frozen=True)
+class MediaSource:
+    """One downloadable file belonging to a post.
+
+    `child_idx` is 0 for a single-media post and 1..N for carousel children,
+    matching `paths.full_filename`.
+    """
+
+    child_idx: int
+    url: str
+    mime: str
+    is_video: bool
+
+
+@dataclass(frozen=True)
+class MediaHint:
+    """What the handler knows about a post that the adapter cannot look up.
+
+    Business Discovery has no per-media endpoint, so refreshing an expired
+    url means re-listing the owning profile. The adapter has no database
+    access, so the handler passes the owner and the last known urls here.
+    """
+
+    username: str
+    sources: tuple[MediaSource, ...]
+    captured_at: str
+
+
+@dataclass(frozen=True)
 class IgPost:
     shortcode: str
     kind: str  # image | video | reel | carousel
@@ -56,6 +84,7 @@ class IgPost:
     child_count: int
     thumb_url: str
     ig_url: str
+    sources: tuple[MediaSource, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -79,7 +108,9 @@ class IgAdapter(Protocol):
 
     def fetch_page(self, username: str, cursor: str | None, limit: int) -> IgPage: ...
 
-    def fetch_media(self, shortcode: str, dest_dir: Path) -> list[SavedFile]: ...
+    def fetch_media(
+        self, shortcode: str, dest_dir: Path, hint: MediaHint | None = None
+    ) -> list[SavedFile]: ...
 
     def download_to(self, url: str, dest: Path) -> SavedFile: ...
 

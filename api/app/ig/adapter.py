@@ -172,7 +172,9 @@ class InstaloaderAdapter:
         except Exception as exc:
             raise classify(exc) from exc
 
-    def fetch_media(self, shortcode: str, dest_dir: Path) -> list[t.SavedFile]:
+    def fetch_media(
+        self, shortcode: str, dest_dir: Path, hint: t.MediaHint | None = None
+    ) -> list[t.SavedFile]:
         self._ensure_login()
         try:
             post = instaloader.Post.from_shortcode(self._loader.context, shortcode)
