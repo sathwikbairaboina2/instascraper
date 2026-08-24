@@ -9,7 +9,8 @@ def test_canary_ok_against_the_fake(client):
 
 
 def test_canary_reports_failure_without_raising(client):
-    client.app_state.adapter.raise_on("fetch_profile", t.IgChallenge("checkpoint_required"))
+    adapter = client.app_state.runtime.current.adapter
+    adapter.raise_on("fetch_profile", t.IgChallenge("checkpoint_required"))
 
     body = client.get("/api/health/canary?username=nike").json()
 

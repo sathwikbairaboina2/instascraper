@@ -10,7 +10,7 @@ def get_conn_dep(request: Request):
     dependency on a different threadpool thread than the one that runs the
     endpoint, so a cached per-thread connection would be used off-thread.
     """
-    conn = db.new_conn(request.app.state.settings)
+    conn = db.new_conn(request.app.state.runtime.current.settings)
     try:
         yield conn
     finally:

@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app import db
+from app import runtime
 from app.config import Settings, load_settings
 from app.ig.factory import make_adapter
 from app.routes import activity as activity_routes
@@ -13,7 +13,6 @@ from app.routes import health as health_routes
 from app.routes import media as media_routes
 from app.routes import profiles as profile_routes
 from app.routes import status as status_routes
-from app.worker import sweep
 from app.worker.breaker import Breaker
 from app.worker.handlers import HANDLERS
 from app.worker.pacer import Pacer
@@ -27,25 +26,27 @@ def create_app(
     adapter=None,
     start_worker: bool = True,
 ) -> FastAPI:
-    settings = settings or load_settings()
-    adapter = adapter or make_adapter(settings)
+    base = settings or load_settings()
+    # An injected adapter pins the runtime: the test suite supplies its own
+    # fake and must keep the base paths it also opens directly.
+    name = base.adapter if adapter is not None else runtime.read_selection(base)
+    active = base if adapter is not None else runtime.settings_for(base, name)
+    holder = runtime.RuntimeConfig(
+        base, runtime.Runtime(name, active, adapter or make_adapter(active))
+    )
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        conn = db.get_conn(settings)
-        db.init_schema(conn)
-        db.migrate(conn)
-        for directory in (settings.media_dir, settings.out_dir):
-            directory.mkdir(parents=True, exist_ok=True)
-        result = sweep.sweep(conn, settings.media_dir)
+        current = app.state.runtime.current
+        result = runtime.prepare_data_root(current.settings)
         # json.dumps, not %s: a dict interpolated into a string emits Python
         # repr with single quotes, which is not parseable JSON.
         logging.info(json.dumps({"event": "sweep", **result}))
 
         if start_worker:
             worker = Worker(
-                settings=settings,
-                adapter=adapter,
+                settings=current.settings,
+                adapter=current.adapter,
                 breaker=app.state.breaker,
                 pacer=app.state.pacer,
                 handlers=HANDLERS,
@@ -58,10 +59,9 @@ def create_app(
             worker.shutdown()
 
     app = FastAPI(title="instascraper", lifespan=lifespan)
-    app.state.settings = settings
-    app.state.adapter = adapter
+    app.state.runtime = holder
     app.state.breaker = Breaker()
-    app.state.pacer = Pacer(min_interval=settings.ig_min_interval)
+    app.state.pacer = Pacer(min_interval=base.ig_min_interval)
     app.state.worker = None
 
     app.include_router(status_routes.router, prefix="/api")

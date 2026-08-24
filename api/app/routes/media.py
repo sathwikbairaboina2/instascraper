@@ -25,7 +25,7 @@ def get_thumb(shortcode: str, request: Request, conn=Depends(get_conn_dep)):
     row = _file_row(conn, shortcode, "thumb", 0)
     if row is None:
         raise HTTPException(status_code=404, detail={"message": "no thumbnail cached"})
-    path = request.app.state.settings.media_dir / row["path"]
+    path = request.app.state.runtime.current.settings.media_dir / row["path"]
     if not path.exists():
         raise HTTPException(status_code=404, detail={"message": "thumbnail file missing"})
     return FileResponse(path, media_type=row["mime"] or "image/jpeg")
@@ -46,7 +46,7 @@ def get_full(
     row = _file_row(conn, shortcode, "full", child)
     if row is None:
         raise HTTPException(status_code=404, detail={"message": "no such child"})
-    path = request.app.state.settings.media_dir / row["path"]
+    path = request.app.state.runtime.current.settings.media_dir / row["path"]
     if not path.exists():
         raise HTTPException(status_code=404, detail={"message": "file missing"})
     return FileResponse(

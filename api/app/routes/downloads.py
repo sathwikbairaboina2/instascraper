@@ -17,7 +17,12 @@ def create_download(body: DownloadBody, request: Request, conn=Depends(get_conn_
     if not body.shortcodes:
         raise HTTPException(status_code=400, detail={"message": "no items selected"})
     try:
-        return downloads.run(conn, request.app.state.settings, body.shortcodes, body.base)
+        return downloads.run(
+            conn,
+            request.app.state.runtime.current.settings,
+            body.shortcodes,
+            body.base,
+        )
     except downloads.NotReady as exc:
         raise HTTPException(
             status_code=409,

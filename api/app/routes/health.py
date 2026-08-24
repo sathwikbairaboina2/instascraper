@@ -35,7 +35,7 @@ def run_canary(adapter, username: str, workdir: Path) -> dict:
 @router.get("/health/canary")
 def canary(request: Request, username: str = Query(DEFAULT_CANARY)):
     with tempfile.TemporaryDirectory() as tmp:
-        return run_canary(request.app.state.adapter, username, Path(tmp))
+        return run_canary(request.app.state.runtime.current.adapter, username, Path(tmp))
 
 
 @router.post("/health/clear-breaker")

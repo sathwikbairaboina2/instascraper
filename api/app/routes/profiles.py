@@ -95,7 +95,7 @@ def get_avatar(username: str, request: Request, conn=Depends(get_conn_dep)):
     ).fetchone()
     if row is None or not row["avatar_path"]:
         raise HTTPException(status_code=404, detail={"message": "no avatar cached"})
-    path = request.app.state.settings.media_dir / row["avatar_path"]
+    path = request.app.state.runtime.current.settings.media_dir / row["avatar_path"]
     if not path.exists():
         raise HTTPException(status_code=404, detail={"message": "avatar file missing"})
     return FileResponse(path, media_type="image/jpeg")
@@ -164,7 +164,7 @@ def load_more(username: str, request: Request, conn=Depends(get_conn_dep)):
 
 @router.delete("/profiles/{username}/cache")
 def clear_cache(username: str, request: Request, conn=Depends(get_conn_dep)):
-    media_root = request.app.state.settings.media_dir
+    media_root = request.app.state.runtime.current.settings.media_dir
     target = media_root / username
     removed = 0
     if target.exists():

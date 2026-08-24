@@ -38,3 +38,24 @@ def test_activity_respects_limit(client, conn):
     for i in range(5):
         activity.record(conn, "lookup", f"user{i}", None)
     assert len(client.get("/api/activity?limit=2").json()["items"]) == 2
+
+
+def test_status_reports_the_live_adapter(client):
+    body = client.get("/api/status").json()
+    assert body["adapter"] == "fake"
+
+
+def test_app_exposes_a_runtime_holder(client):
+    holder = client.app_state.runtime
+    assert holder.current.name == "fake"
+    assert holder.base is not None
+
+
+def test_injected_adapter_pins_the_runtime(settings):
+    """conftest injects an adapter; it must not be rebuilt from settings."""
+    from app.ig.fake import FakeAdapter
+    from app.main import create_app
+
+    injected = FakeAdapter()
+    app = create_app(settings=settings, adapter=injected, start_worker=False)
+    assert app.state.runtime.current.adapter is injected
