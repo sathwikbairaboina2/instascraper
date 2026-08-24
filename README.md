@@ -12,8 +12,12 @@ Two containers. `web` is Next.js and proxies `/api/*` to `api`. `api` is
 FastAPI on uvicorn with `--workers 1`, running the HTTP event loop plus
 exactly one fetch worker thread. That worker thread is the only code that
 talks to Instagram, which makes request serialization structural rather than
-a convention. All Instaloader usage is confined to `api/app/ig/`, so an
+a convention. All Meta Graph API usage is confined to `api/app/ig/`, so an
 Instagram-side breakage has a one-directory blast radius.
+
+Data comes from Meta's Business Discovery API, which sees **public Business
+and Creator accounts only**. Personal accounts are invisible to it, and no
+workaround exists -- that is a property of the API, not a missing feature.
 
 Profile lookups fetch metadata and thumbnails. Full-resolution media is
 fetched only when you select something and press Download, then cached
@@ -21,12 +25,34 @@ forever.
 
 ## Setup
 
-    cp .env.example .env      # fill in IG_USERNAME, IG_PASSWORD, OUT_DIR
+    cp .env.example .env      # fill in the IG_GRAPH_* values and OUT_DIR
     docker compose build
-    docker compose run --rm api python -m app.ig.login
     docker compose up -d
 
 Open http://localhost:3000.
+
+### Getting the Graph credentials
+
+Business Discovery reads other accounts through an account of your own, so
+there is a one-time setup. None of it can be automated.
+
+1. Convert an Instagram account to **Business** or **Creator**.
+2. Create or choose a **Facebook Page**, and link the Instagram account to
+   it. Business Discovery is only available through the Facebook-Login
+   flavour of the API, so this link is mandatory.
+3. Create a **Meta developer app** at developers.facebook.com and add the
+   Instagram product.
+4. Grant the token `instagram_basic`, `pages_show_list`,
+   `pages_read_engagement` and `business_management`.
+5. Find your Instagram user id: `GET /me/accounts` for the Page id, then
+   `GET /{page-id}?fields=instagram_business_account`.
+6. Prefer a **Business Manager system-user token**, which does not expire,
+   over a long-lived user token, which expires after 60 days.
+
+Put the results in `.env` as `IG_GRAPH_TOKEN`, `IG_GRAPH_USER_ID` and
+`IG_GRAPH_VERSION`, then verify without starting the stack:
+
+    cd api && IG_GRAPH_TOKEN=... python -m pytest tests/test_live_canary.py -v
 
 ## Everyday use
 
@@ -42,44 +68,26 @@ finishes immediately.
 ## When the banner appears
 
 - **Rate limited** — the worker paused itself. Nothing to do; it resumes.
-- **Session invalid** — run the login command above, then press
-  "I have fixed it" in the banner.
+- **Token invalid** — the token expired or was revoked. Issue a new one,
+  update `.env`, restart, then press "I have fixed it" in the banner.
+- **Token not configured** — `IG_GRAPH_TOKEN` is empty. See Setup above.
 - **Empty grids and odd errors** — Instagram probably rotated something.
   Run the canary:
 
-      cd api && python -m pytest -m live
+      cd api && IG_GRAPH_TOKEN=... python -m pytest tests/test_live_canary.py -v
 
-  A failure there means `api/app/ig/adapter.py` needs updating. That is the
-  only file that should ever need to change for this class of break.
+  A failure there means `api/app/ig/graph_map.py` needs updating -- it is
+  the only file that should ever need to change when Meta reshapes a
+  response. Re-record the fixtures first:
 
-## Upgrading Instaloader
-
-Instagram rotates internal identifiers and breaks Instaloader every few weeks.
-When that happens the canary fails and `api/app/ig/adapter.py` needs a look —
-`classify()` and `post_to_igpost()` first. Upgrading is scripted:
-
-    bash scripts/bump-instaloader.sh --check      # test the current pin
-    bash scripts/bump-instaloader.sh 4.15.3       # bump, verify, report
-
-The script runs the adapter's contract tests before and after, installs the new
-version, then runs the live canary. A failed install or failed contract suite
-restores the old pin automatically.
-
-**It will not call a bump verified without the canary.** A green contract suite
-only proves the parsers still agree with checked-in fixtures — not with
-Instagram. Without credentials in `.env` the script reports `PARTIAL` and says
-so explicitly.
-
-Current status: `4.15.3` passes the contract suite and the full backend suite,
-but has never been checked against live Instagram. The pin stays at `4.14.1`
-until it has.
+      cd api && python scripts/capture_graph_fixtures.py nike
 
 ## Tests
 
-    cd api && python -m pytest        # backend, no network (125 tests)
+    cd api && python -m pytest        # backend, no network (203 tests)
     bash scripts/e2e-native.sh        # full stack on the host, no Docker
     bash scripts/e2e.sh               # same suite via Compose
-    cd api && python -m pytest -m live   # opt-in, hits Instagram
+    cd api && IG_GRAPH_TOKEN=... python -m pytest tests/test_live_canary.py
 
 The backend suite runs against an in-memory fake adapter and never touches
 the network. The e2e suite seeds a throwaway database under `.e2e/` and runs
@@ -94,7 +102,7 @@ the whole stack with `IG_ADAPTER=fake`.
 Then use `scripts/e2e-native.sh`, or start the two processes by hand:
 
     cd api && DB_PATH=../data/app.db MEDIA_DIR=../data/media \
-      SESSION_DIR=../data/session OUT_DIR_CONTAINER=../downloads \
+      OUT_DIR_CONTAINER=../downloads \
       ../.venv/Scripts/python -m uvicorn app.main:app --port 8000 --workers 1
 
     cd web && API_ORIGIN=http://127.0.0.1:8000 npm run dev
