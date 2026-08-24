@@ -42,7 +42,9 @@ options reviewed):
 - Track / Sync / Clear cache as a right-hand action group. These are tool
   actions, not profile actions, so they do not sit under the bio where
   Instagram puts Follow and Message.
-- Centred, letter-spaced tab bar under the header.
+- Centred, letter-spaced tab bar under the header, active item underlined
+  from above. Not a Segmented chip: beside the caption search that reads as
+  one more filter rather than a section of the profile.
 - Filter row below the tabs: caption search, cached-only, Reset, visible
   count, grid/table switch, Select all, Load more.
 - Selection rail on the right, unchanged. Lightbox unchanged.
@@ -79,12 +81,20 @@ file and the theme Segmented leaves the header.
 | hairline | `#262626` | `#dbdbdb` |
 | text | `#f5f5f5` | `#000000` |
 | text secondary | `#a8a8a8` | `#737373` |
-| action | `#0095f6` | `#0095f6` |
+| action | `#e1306c` | `#e1306c` |
 | destructive | `#ed4956` | `#ed4956` |
 
-The story gradient (`#fcb045 -> #fd1d1d -> #833ab4`) appears on the avatar
-ring and nowhere else. Instagram uses it sparingly; spread across buttons it
-reads as imitation.
+The story gradient (`#fcb045 -> #fd1d1d -> #833ab4`) was originally confined
+to the avatar ring. **Superseded on review:** the gradient is now the primary
+colour, painted on primary buttons, the selected segmented item and the logo
+mark. The tradeoff was put side by side and the branded reading was chosen
+over the recessive one.
+
+antd drives every control from a single `colorPrimary`, which cannot hold a
+gradient, so `action` becomes `#e1306c` -- the magenta sampled from the middle
+of the sweep -- and carries focus rings, checkbox ticks and 1px borders, which
+no gradient can tint cleanly. The gradient rules are scoped away from disabled
+controls: white-on-flat erases the label naming the live dataset.
 
 antd's `ConfigProvider` takes these as `colorPrimary`, `colorBgBase`,
 `colorBorder`, `colorError`.
