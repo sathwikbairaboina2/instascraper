@@ -12,6 +12,12 @@ export type StatusBody = {
   /** Percentage of Meta's hourly quota spent, as Meta last reported it.
    *  Null when the live adapter never calls Meta. */
   usage: number | null
+  /** Our own scraping caps, not Meta's. Null when the live adapter never
+   *  reaches instagram.com. */
+  reel_limits: {
+    hour: { used: number; max: number; resets_at: string | null }
+    day: { used: number; max: number; resets_at: string | null }
+  } | null
 }
 
 export type ProfileSummary = {

@@ -30,6 +30,7 @@ import { useState } from 'react'
 import { clearBreaker, getProfiles, getStatus, setAdapter, syncProfile } from '@/lib/api'
 import { GRADIENT, GRADIENT_LINEAR } from '@/lib/themes'
 import { usePolling } from '@/lib/usePolling'
+import ReelLimits from './ReelLimits'
 import UsageMeter from './UsageMeter'
 import { useThemePref } from './ThemeProvider'
 
@@ -211,6 +212,7 @@ export default function AppShell({
           <div style={{ flex: 1 }} />
           <Badge status={status?.worker === 'running' ? 'processing' : 'default'} />
           <UsageMeter usage={status?.usage} />
+          <ReelLimits limits={status?.reel_limits ?? null} />
           <Button size="small" type="text" onClick={() => setQueueOpen(true)}>
             Queue {status?.queue_depth ?? 0}
           </Button>

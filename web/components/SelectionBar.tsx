@@ -67,7 +67,21 @@ export default function SelectionBar({
       const state = await ensureMedia(shortcodes)
       setProgress(state)
 
-      const failed = Object.entries(state.errors ?? {})
+      const refused = Object.entries(state.statuses)
+        .filter(([, s]) => s === 'quota')
+        .map(([sc]) => sc)
+      if (refused.length > 0) {
+        const why = state.errors?.[refused[0]] ?? 'reel cap spent'
+        // Not a failure: the app declined to start. Saying "failed" here
+        // sends you looking for a bug that is not there.
+        setError(`${refused.length} not fetched — ${why}.`)
+        setPhase('error')
+        return
+      }
+
+      const failed = Object.entries(state.errors ?? {}).filter(
+        ([sc]) => state.statuses[sc] !== 'quota',
+      )
       if (failed.length > 0) {
         const shown = failed.slice(0, 2).map(([sc, why]) => `${sc}: ${why}`).join(' · ')
         setError(`${failed.length} failed. ${shown}${failed.length > 2 ? ` (+${failed.length - 2} more)` : ''}`)
