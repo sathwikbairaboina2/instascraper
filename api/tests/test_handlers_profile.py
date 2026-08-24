@@ -47,6 +47,30 @@ def test_profile_sync_enqueues_first_page_only_once(ctx):
     assert ctx.enqueued == []
 
 
+def test_profile_sync_restarts_an_exhausted_walk(ctx):
+    """Re-sync is the only way back from exhaustion.
+
+    Nothing else clears the empty-string cursor, so a profile indexed under
+    a build that ended its walk early would be stuck forever. Business
+    Discovery also serves newest first, which makes re-walking from the
+    front the only way a post published since the last sync is ever seen.
+    """
+    ctx.adapter.add_profile("nike")
+    handlers.handle_profile_sync(ctx, {"username": "nike"})
+    ctx.conn.execute("UPDATE profiles SET next_cursor='' WHERE username='nike'")
+    ctx.enqueued.clear()
+
+    handlers.handle_profile_sync(ctx, {"username": "nike"})
+
+    assert ctx.enqueued == [("page_fetch", {"username": "nike"})]
+    assert (
+        ctx.conn.execute(
+            "SELECT next_cursor FROM profiles WHERE username='nike'"
+        ).fetchone()["next_cursor"]
+        is None
+    )
+
+
 def test_profile_sync_records_private_profile_then_raises(ctx):
     ctx.adapter.add_profile("secret", is_private=True)
 

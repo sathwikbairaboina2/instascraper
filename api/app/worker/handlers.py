@@ -46,8 +46,17 @@ def handle_profile_sync(ctx: HandlerContext, payload: dict) -> None:
     row = ctx.conn.execute(
         "SELECT next_cursor FROM profiles WHERE username=?", (username,)
     ).fetchone()
-    if row["next_cursor"] is None:
-        ctx.enqueue("page_fetch", {"username": username})
+    if row["next_cursor"] == "":
+        # Exhausted, and nothing else clears that state. A sync is a
+        # deliberate "look again", and Business Discovery serves newest
+        # first, so the walk restarts at the front rather than resuming
+        # from a cursor that has nothing left behind it.
+        ctx.conn.execute(
+            "UPDATE profiles SET next_cursor=NULL WHERE username=?", (username,)
+        )
+    elif row["next_cursor"] is not None:
+        return  # a walk is already part-way through; leave its cursor alone
+    ctx.enqueue("page_fetch", {"username": username})
 
 
 def handle_page_fetch(ctx: HandlerContext, payload: dict) -> None:
