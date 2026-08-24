@@ -153,3 +153,112 @@ def test_exhausted_page_reports_no_cursor(graph_settings):
     transport = Transport((200, {}, load("media_last_page.json")))
     page = GraphAdapter(graph_settings, transport=transport).fetch_page("nike", "c", 36)
     assert page.next_cursor is None
+
+
+class Fetcher:
+    """Serves bytes per url; any url not listed is treated as expired."""
+
+    def __init__(self, available):
+        self.available = dict(available)
+        self.requested = []
+
+    def __call__(self, url):
+        self.requested.append(url)
+        if url in self.available:
+            return 200, self.available[url]
+        return 403, b""
+
+
+def hint_for(url, username="nike"):
+    return t.MediaHint(
+        username=username,
+        sources=(t.MediaSource(0, url, "image/jpeg", False),),
+        captured_at="2026-08-20T00:00:00+00:00",
+    )
+
+
+def test_fetch_media_downloads_from_the_cached_url(graph_settings, tmp_path):
+    fetcher = Fetcher({"https://cdn/fresh.jpg": b"IMAGEBYTES"})
+    adapter = GraphAdapter(graph_settings, transport=Transport(), fetcher=fetcher)
+
+    saved = adapter.fetch_media("AAAAAAAAAAA", tmp_path, hint_for("https://cdn/fresh.jpg"))
+
+    assert [s.child_idx for s in saved] == [0]
+    assert saved[0].path.read_bytes() == b"IMAGEBYTES"
+    assert saved[0].mime == "image/jpeg"
+    assert list(tmp_path.glob("*.part")) == []
+
+
+def test_expired_url_triggers_a_refresh_and_succeeds(graph_settings, tmp_path):
+    """The cached url 403s; a re-listing supplies a working one."""
+    fetcher = Fetcher({"https://scontent.cdninstagram.com/img1.jpg": b"REFRESHED"})
+    transport = Transport((200, {}, load("media_page.json")))
+    adapter = GraphAdapter(graph_settings, transport=transport, fetcher=fetcher)
+
+    saved = adapter.fetch_media("AAAAAAAAAAA", tmp_path, hint_for("https://cdn/stale.jpg"))
+
+    assert saved[0].path.read_bytes() == b"REFRESHED"
+    assert len(transport.urls) == 1
+
+
+def test_refresh_stops_at_the_configured_page_bound(graph_settings, tmp_path):
+    """Two pages allowed, post is on neither: give up rather than page forever."""
+    transport = Transport(
+        (200, {}, load("media_page.json")),
+        (200, {}, load("media_page.json")),
+    )
+    adapter = GraphAdapter(graph_settings, transport=transport, fetcher=Fetcher({}))
+
+    with pytest.raises(t.IgNotFound):
+        adapter.fetch_media("NOTONANYPAGE", tmp_path, hint_for("https://cdn/stale.jpg"))
+    assert len(transport.urls) == 2
+
+
+def test_refresh_stops_early_when_the_profile_is_exhausted(graph_settings, tmp_path):
+    transport = Transport((200, {}, load("media_last_page.json")))
+    adapter = GraphAdapter(graph_settings, transport=transport, fetcher=Fetcher({}))
+
+    with pytest.raises(t.IgNotFound):
+        adapter.fetch_media("MISSING", tmp_path, hint_for("https://cdn/stale.jpg"))
+    assert len(transport.urls) == 1
+
+
+def test_no_hint_means_nothing_can_be_refreshed(graph_settings, tmp_path):
+    adapter = GraphAdapter(graph_settings, transport=Transport(), fetcher=Fetcher({}))
+    with pytest.raises(t.IgNotFound):
+        adapter.fetch_media("AAAAAAAAAAA", tmp_path, None)
+
+
+def test_carousel_children_are_written_with_one_based_names(graph_settings, tmp_path):
+    fetcher = Fetcher({"https://cdn/a.jpg": b"A", "https://cdn/b.mp4": b"B"})
+    hint = t.MediaHint(
+        username="nike",
+        sources=(
+            t.MediaSource(1, "https://cdn/a.jpg", "image/jpeg", False),
+            t.MediaSource(2, "https://cdn/b.mp4", "video/mp4", True),
+        ),
+        captured_at="2026-08-20T00:00:00+00:00",
+    )
+    adapter = GraphAdapter(graph_settings, transport=Transport(), fetcher=fetcher)
+
+    saved = adapter.fetch_media("CCCCCCCCCCC", tmp_path, hint)
+
+    assert [s.child_idx for s in saved] == [1, 2]
+    assert (tmp_path / "full_1.jpg").exists()
+    assert (tmp_path / "full_2.mp4").exists()
+
+
+def test_download_to_writes_a_file(graph_settings, tmp_path):
+    fetcher = Fetcher({"https://cdn/avatar.jpg": b"AV"})
+    adapter = GraphAdapter(graph_settings, transport=Transport(), fetcher=fetcher)
+
+    saved = adapter.download_to("https://cdn/avatar.jpg", tmp_path / "avatar.jpg")
+
+    assert saved.path.read_bytes() == b"AV"
+    assert saved.child_idx == 0
+
+
+def test_download_to_failure_is_transient(graph_settings, tmp_path):
+    adapter = GraphAdapter(graph_settings, transport=Transport(), fetcher=Fetcher({}))
+    with pytest.raises(t.IgTransient):
+        adapter.download_to("https://cdn/gone.jpg", tmp_path / "x.jpg")

@@ -6,10 +6,12 @@ exist only inside a listing response.
 """
 
 import json
+from pathlib import Path
 from urllib.parse import quote
 
 import httpx
 
+from app import paths
 from app.config import Settings
 from app.ig import graph_map, types as t
 
@@ -21,6 +23,8 @@ _MEDIA_FIELDS = (
     "id,caption,media_type,media_product_type,media_url,thumbnail_url,"
     "permalink,timestamp,children{id,media_type,media_url,thumbnail_url}"
 )
+
+_STALE_STATUSES = {403, 404, 410}
 
 _CHALLENGE_CODES = {102, 190}
 _RATE_LIMIT_CODES = {4, 17, 32, 613}
@@ -97,6 +101,10 @@ def classify(
     return t.IgTransient(message)
 
 
+class _Stale(Exception):
+    """A cached CDN url has expired. Internal to this module."""
+
+
 def _httpx_transport(url: str, headers: dict) -> tuple[int, dict, dict]:
     response = httpx.get(url, headers=headers, timeout=30.0)
     try:
@@ -168,3 +176,70 @@ class GraphAdapter:
             f"business_discovery.username({username}){{{media}{{{_MEDIA_FIELDS}}}}}"
         )
         return graph_map.page_from_payload(payload)
+
+    def fetch_media(
+        self, shortcode: str, dest_dir: Path, hint: t.MediaHint | None = None
+    ) -> list[t.SavedFile]:
+        sources = tuple(hint.sources) if hint else ()
+        if not sources:
+            sources = self._refresh(shortcode, hint)
+        try:
+            return self._download_all(sources, dest_dir)
+        except _Stale:
+            # Meta's CDN urls expire. Shallow indexing makes a bounded
+            # re-listing cheap, so this is recoverable rather than fatal.
+            return self._download_all(self._refresh(shortcode, hint), dest_dir)
+
+    def download_to(self, url: str, dest: Path) -> t.SavedFile:
+        try:
+            return self._download(t.MediaSource(0, url, "image/jpeg", False), dest)
+        except _Stale as exc:
+            raise t.IgTransient(f"could not download {dest.name}") from exc
+
+    # ---- internals -----------------------------------------------------
+    def _refresh(self, shortcode: str, hint: t.MediaHint | None) -> tuple[t.MediaSource, ...]:
+        if hint is None or not hint.username:
+            raise t.IgNotFound(
+                f"{shortcode} has no owning profile recorded; re-sync it before opening"
+            )
+        cursor: str | None = None
+        for _ in range(max(1, self._settings.graph_refresh_pages)):
+            page = self.fetch_page(hint.username, cursor, self._settings.page_size)
+            for post in page.posts:
+                if post.shortcode == shortcode:
+                    return post.sources
+            cursor = page.next_cursor
+            if cursor is None:
+                break
+        raise t.IgNotFound(
+            f"{shortcode} is too far back to refresh; re-sync {hint.username} to open it"
+        )
+
+    def _download_all(
+        self, sources: tuple[t.MediaSource, ...], dest_dir: Path
+    ) -> list[t.SavedFile]:
+        saved = []
+        for source in sources:
+            ext = "mp4" if source.is_video else "jpg"
+            dest = dest_dir / paths.full_filename(source.child_idx, ext)
+            saved.append(self._download(source, dest))
+        return saved
+
+    def _download(self, source: t.MediaSource, dest: Path) -> t.SavedFile:
+        try:
+            status, payload = self._fetcher(source.url)
+        except Exception as exc:
+            raise t.IgTransient(redact(str(exc), self._settings.graph_token)) from exc
+        if status in _STALE_STATUSES:
+            raise _Stale(source.url)
+        if status >= 400 or not payload:
+            raise t.IgTransient(f"CDN returned {status}")
+        size = paths.atomic_write(dest, lambda fh: fh.write(payload))
+        return t.SavedFile(
+            child_idx=source.child_idx,
+            path=dest,
+            mime=source.mime,
+            bytes=size,
+            width=None,
+            height=None,
+        )
