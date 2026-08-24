@@ -137,3 +137,44 @@ test('a tab with nothing in it says so without claiming the list is empty', asyn
   await expect(page.getByTestId('recreate-empty')).toContainText('Nothing done right now')
   await expect(page.getByTestId('recreate-list')).toHaveCount(0)
 })
+
+test('a profile has a tab for what it has lined up', async ({ page }) => {
+  await page.goto('/p/nike')
+  await page.getByTestId('recreate-nike-0').click()
+  await expect(page.getByTestId('recreate-flag-nike-0')).toBeVisible()
+
+  await page.getByTestId('profile-tabs').getByText('RECREATE', { exact: true }).click()
+
+  await expect(page.getByTestId('tile-nike-0')).toBeVisible()
+  await expect(page.getByTestId('tile-nike-1')).toHaveCount(0)
+})
+
+test('the recreate tab is empty until something is marked', async ({ page }) => {
+  await page.goto('/p/nike')
+
+  await page.getByTestId('profile-tabs').getByText('RECREATE', { exact: true }).click()
+
+  await expect(page.getByTestId('media-grid').locator('.tile')).toHaveCount(0)
+})
+
+test('a tile in the recreate tab opens its item rather than selecting', async ({ page }) => {
+  await page.goto('/p/nike')
+  await page.getByTestId('recreate-nike-4').click()
+  await expect(page.getByTestId('recreate-flag-nike-4')).toBeVisible()
+
+  await page.getByTestId('profile-tabs').getByText('RECREATE', { exact: true }).click()
+  await page.getByTestId('tile-nike-4').click()
+
+  await expect(page).toHaveURL(/\/recreate\/nike-4$/)
+  await expect(page.getByTestId('no-generator')).toBeVisible()
+})
+
+test('a tile still selects on the other tabs', async ({ page }) => {
+  // The open behaviour is scoped to one tab; everywhere else a click must
+  // still build a selection, or download stops working.
+  await page.goto('/p/nike')
+
+  await page.getByTestId('tile-nike-0').click()
+
+  await expect(page.getByTestId('selection-count')).toHaveText('1 selected')
+})

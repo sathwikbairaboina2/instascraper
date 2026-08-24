@@ -33,6 +33,7 @@ import {
   Typography,
   theme,
 } from 'antd'
+import { useRouter } from 'next/navigation'
 import { use, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import AppShell from '@/components/AppShell'
@@ -117,6 +118,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
   )
 
   const recreate = useRecreateShared()
+  const router = useRouter()
 
   useEffect(() => setSaved(loadSelections(username)), [username])
 
@@ -130,14 +132,17 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
   }, [windowSize, refreshMedia])
 
   const items = useMemo(() => media?.items ?? [], [media])
-  const visible = useMemo(() => applyFilters(items, filters), [items, filters])
+  const visible = useMemo(
+    () => applyFilters(items, filters, recreate.marked),
+    [items, filters, recreate.marked],
+  )
   // The tab is the partition, not a filter within one. "2 of 10" on the
   // reels tab counts posts the tab was never going to show; the honest
   // denominator is what the tab holds before search and cached-only
   // narrow it further.
   const inTab = useMemo(
-    () => items.filter((item) => matchesKind(item, filters.kind)),
-    [items, filters.kind],
+    () => items.filter((item) => matchesKind(item, filters.kind, recreate.marked)),
+    [items, filters.kind, recreate.marked],
   )
   const ids = useMemo(() => visible.map((i) => i.shortcode), [visible])
   const selection = useSelection(ids)
@@ -307,7 +312,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
           borderBottom: `1px solid ${token.colorBorderSecondary}`,
         }}
       >
-        {(['posts', 'reels', 'saved'] as KindFilter[]).map((kind) => {
+        {(['posts', 'reels', 'saved', 'recreate'] as KindFilter[]).map((kind) => {
           const on = filters.kind === kind
           return (
             <div
@@ -422,6 +427,14 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
                     marked={recreate.marked.has(item.shortcode)}
                     onRecreate={() => void recreate.toggle(item.shortcode)}
                     selected={selection.isSelected(item.shortcode)}
+                    openHref={
+                      filters.kind === 'recreate'
+                        ? `/recreate/${encodeURIComponent(item.shortcode)}`
+                        : undefined
+                    }
+                    onOpen={() =>
+                      router.push(`/recreate/${encodeURIComponent(item.shortcode)}`)
+                    }
                     onToggle={(shift) => selection.toggle(item.shortcode, shift)}
                     onRetry={() => onRetry(item.shortcode)}
                     onPreview={() => setPreview(item)}

@@ -34,6 +34,8 @@ export default function MediaTile({
   onPreview,
   marked = false,
   onRecreate,
+  openHref,
+  onOpen,
 }: {
   item: MediaSummary
   selected: boolean
@@ -42,6 +44,11 @@ export default function MediaTile({
   onPreview: () => void
   marked?: boolean
   onRecreate?: () => void
+  /** Set on tabs where a tile is a way into something rather than something
+   *  to select. Selection, and therefore shift-click ranges and the download
+   *  flow, are unavailable while this is set. */
+  openHref?: string
+  onOpen?: () => void
 }) {
   const { token } = theme.useToken()
   const [hover, setHover] = useState(false)
@@ -62,11 +69,12 @@ export default function MediaTile({
         aria-label={item.shortcode}
         data-testid={`tile-${item.shortcode}`}
         className="tile"
-        onClick={(e) => onToggle(e.shiftKey)}
+        onClick={(e) => (openHref ? onOpen?.() : onToggle(e.shiftKey))}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault()
-            onToggle(e.shiftKey)
+            if (openHref) onOpen?.()
+            else onToggle(e.shiftKey)
           }
         }}
         style={{
@@ -157,9 +165,11 @@ export default function MediaTile({
 
       {/* Controls sit outside the tile button: a button cannot nest a button,
           and nesting would swallow the selection click. */}
-      <div style={{ position: 'absolute', top: 8, left: 8, opacity: show ? 1 : 0.55, transition: 'opacity .15s ease' }}>
-        <Checkbox checked={selected} onChange={() => onToggle(false)} />
-      </div>
+      {!openHref && (
+        <div style={{ position: 'absolute', top: 8, left: 8, opacity: show ? 1 : 0.55, transition: 'opacity .15s ease' }}>
+          <Checkbox checked={selected} onChange={() => onToggle(false)} />
+        </div>
+      )}
 
       {/* Always rendered, never hover gated. A control that only exists on
           hover cannot be reached by keyboard or touch. */}
