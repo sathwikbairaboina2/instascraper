@@ -24,11 +24,12 @@ import {
   theme,
 } from 'antd'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import { useState } from 'react'
 
-import { clearBreaker, getProfiles, getStatus, setAdapter, syncProfile } from '@/lib/api'
+import { clearBreaker, getProfiles, getStatus, setAdapter } from '@/lib/api'
 import { GRADIENT, GRADIENT_LINEAR } from '@/lib/themes'
+import { useLookup } from '@/lib/useLookup'
 import { usePolling } from '@/lib/usePolling'
 import ReelLimits from './ReelLimits'
 import UsageMeter from './UsageMeter'
@@ -46,8 +47,10 @@ export default function AppShell({
 }) {
   const { token } = theme.useToken()
   const { dark, setDark } = useThemePref()
-  const router = useRouter()
-  const [lookup, setLookup] = useState('')
+  // Derived from the route rather than passed in: a page added later cannot
+  // forget to say "I already have a search box".
+  const onHome = usePathname() === '/'
+  const { value: lookup, setValue: setLookup, submit: submitLookup } = useLookup()
 
   const switchAdapter = (next: string) => {
     if (next === status?.adapter) return
@@ -73,14 +76,6 @@ export default function AppShell({
   const breaker = status?.breaker
   const items = profiles?.items ?? []
 
-  async function submitLookup() {
-    const clean = lookup.trim().replace(/^@/, '')
-    if (!clean) return
-    await syncProfile(clean)
-    setLookup('')
-    router.push(`/p/${encodeURIComponent(clean)}`)
-  }
-
   return (
     <Layout style={{ height: '100dvh', overflow: 'hidden' }}>
       <Sider
@@ -103,24 +98,28 @@ export default function AppShell({
             </Flex>
           </Link>
 
-          <div style={{ padding: '0 12px 12px', flex: 'none' }}>
-            <Space.Compact style={{ width: '100%' }}>
-              <Input
-                data-testid="username-input"
-                placeholder="Look up a profile"
-                value={lookup}
-                onChange={(e) => setLookup(e.target.value)}
-                onPressEnter={submitLookup}
-              />
-              <Button
-                type="primary"
-                data-testid="lookup-submit"
-                aria-label="Look up profile"
-                icon={<SearchOutlined />}
-                onClick={submitLookup}
-              />
-            </Space.Compact>
-          </div>
+          {/* Home carries its own, larger, search. Two boxes on one screen is
+              a question about which one is the real one. */}
+          {!onHome && (
+            <div style={{ padding: '0 12px 12px', flex: 'none' }}>
+              <Space.Compact style={{ width: '100%' }}>
+                <Input
+                  data-testid="username-input"
+                  placeholder="Look up a profile"
+                  value={lookup}
+                  onChange={(e) => setLookup(e.target.value)}
+                  onPressEnter={() => void submitLookup()}
+                />
+                <Button
+                  type="primary"
+                  data-testid="lookup-submit"
+                  aria-label="Look up profile"
+                  icon={<SearchOutlined />}
+                  onClick={() => void submitLookup()}
+                />
+              </Space.Compact>
+            </div>
+          )}
 
           <Text type="secondary" style={{ fontSize: 11, letterSpacing: '.08em', padding: '0 16px 8px' }}>
             TRACKED
