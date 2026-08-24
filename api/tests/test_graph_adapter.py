@@ -150,9 +150,22 @@ def test_later_page_threads_the_cursor_into_after(graph_settings):
 
 
 def test_exhausted_page_reports_no_cursor(graph_settings):
+    """An empty page ends the walk even though Meta still hands back a cursor."""
     transport = Transport((200, {}, load("media_last_page.json")))
     page = GraphAdapter(graph_settings, transport=transport).fetch_page("nike", "c", 36)
     assert page.next_cursor is None
+
+
+def test_a_full_page_pages_on_without_a_next_link(graph_settings):
+    """The nested media edge never sends `paging.next`.
+
+    Business Discovery returns `paging.cursors.after` alone, so keying the
+    walk on `next` marked every profile exhausted after its first page.
+    """
+    transport = Transport((200, {}, load("media_page.json")))
+    page = GraphAdapter(graph_settings, transport=transport).fetch_page("nike", None, 36)
+    assert page.posts
+    assert page.next_cursor == "CURSOR_AFTER_1"
 
 
 class Fetcher:

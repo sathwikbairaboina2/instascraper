@@ -109,7 +109,10 @@ def page_from_payload(payload: dict) -> t.IgPage:
     media = (payload.get("business_discovery") or {}).get("media") or {}
     posts = [post_from_node(node) for node in media.get("data") or []]
     paging = media.get("paging") or {}
-    # An `after` cursor is present even on the final page. Only the presence
-    # of `next` proves another page exists.
-    cursor = (paging.get("cursors") or {}).get("after") if paging.get("next") else None
+    # The nested media edge never sends `paging.next` -- only `cursors.after`,
+    # and it sends that even when nothing follows. So the page's own contents
+    # are the signal: keep walking while posts come back, and stop on the
+    # first empty page. That costs one extra request at the end of a profile
+    # and is the only honest terminator Meta offers here.
+    cursor = (paging.get("cursors") or {}).get("after") if posts else None
     return t.IgPage(posts=posts, next_cursor=cursor)

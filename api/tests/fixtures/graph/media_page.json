@@ -45,8 +45,9 @@
         }
       ],
       "paging": {
-        "cursors": {"after": "CURSOR_AFTER_1"},
-        "next": "https://graph.facebook.com/next-page"
+        "cursors": {
+          "after": "CURSOR_AFTER_1"
+        }
       }
     }
   },
