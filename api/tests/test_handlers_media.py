@@ -21,6 +21,8 @@ def ready_ctx(settings, conn):
         enqueue=lambda kind, payload: None,
     )
     handlers.handle_profile_sync(ctx, {"username": "nike"})
+    # Two pages: the first one is deliberately small.
+    handlers.handle_page_fetch(ctx, {"username": "nike"})
     handlers.handle_page_fetch(ctx, {"username": "nike"})
     return ctx
 

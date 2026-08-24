@@ -16,7 +16,7 @@ def _settings(**over) -> Settings:
     base = dict(
         ig_username="", ig_password="",
         db_path=None, media_dir=None, session_dir=None, out_dir=None,
-        page_size=36, ig_min_interval=3, ig_backoff=900, adapter="real",
+        page_size=36, first_page_size=3, ig_min_interval=3, ig_backoff=900, adapter="real",
         anonymous=True, max_sleep=60,
     )
     base.update(over)

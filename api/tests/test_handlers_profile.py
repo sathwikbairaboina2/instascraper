@@ -73,17 +73,17 @@ def test_page_fetch_inserts_items_thumbs_and_cursor(ctx, settings):
     items = ctx.conn.execute(
         "SELECT * FROM media_items ORDER BY shortcode"
     ).fetchall()
-    assert len(items) == settings.page_size
+    assert len(items) == settings.first_page_size
     assert items[0]["full_status"] == "none"
     thumbs = ctx.conn.execute(
         "SELECT * FROM media_files WHERE role='thumb'"
     ).fetchall()
-    assert len(thumbs) == settings.page_size
+    assert len(thumbs) == settings.first_page_size
     assert (settings.media_dir / "nike" / "nike-0" / "thumb.jpg").exists()
     cursor = ctx.conn.execute(
         "SELECT next_cursor FROM profiles WHERE username='nike'"
     ).fetchone()["next_cursor"]
-    assert cursor == str(settings.page_size)
+    assert cursor == str(settings.first_page_size)
 
 
 def test_page_fetch_resumes_from_stored_cursor(ctx, settings):
@@ -100,13 +100,13 @@ def test_page_fetch_resumes_from_stored_cursor(ctx, settings):
             "SELECT shortcode FROM media_items ORDER BY LENGTH(shortcode), shortcode"
         ).fetchall()
     ]
-    assert len(shortcodes) == settings.page_size * 2
+    assert len(shortcodes) == settings.first_page_size + settings.page_size
     assert len(set(shortcodes)) == len(shortcodes)
 
 
 def test_page_fetch_marks_exhaustion_with_empty_string(ctx, settings):
     ctx.adapter.add_profile("nike")
-    ctx.adapter.add_posts("nike", count=3)
+    ctx.adapter.add_posts("nike", count=1)
     handlers.handle_profile_sync(ctx, {"username": "nike"})
 
     handlers.handle_page_fetch(ctx, {"username": "nike"})
@@ -143,3 +143,20 @@ def test_page_fetch_upsert_does_not_clobber_ready_media(ctx):
         "SELECT full_status FROM media_items WHERE shortcode='nike-0'"
     ).fetchone()["full_status"]
     assert status == "ready"
+
+
+def test_first_page_is_small_and_load_more_takes_a_full_page(ctx, settings):
+    # The first page costs one request per post for thumbnails, and it is
+    # spent before the user has said whether this is even the right profile.
+    # Keep it cheap; "Load more" is where the appetite is stated.
+    ctx.adapter.add_profile("nike")
+    ctx.adapter.add_posts("nike", count=20)
+    handlers.handle_profile_sync(ctx, {"username": "nike"})
+
+    handlers.handle_page_fetch(ctx, {"username": "nike"})
+    first = ctx.conn.execute("SELECT COUNT(*) c FROM media_items").fetchone()["c"]
+    assert first == settings.first_page_size
+
+    handlers.handle_page_fetch(ctx, {"username": "nike"})
+    second = ctx.conn.execute("SELECT COUNT(*) c FROM media_items").fetchone()["c"]
+    assert second == settings.first_page_size + settings.page_size

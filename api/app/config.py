@@ -12,6 +12,7 @@ class Settings:
     session_dir: Path
     out_dir: Path
     page_size: int
+    first_page_size: int
     ig_min_interval: float
     ig_backoff: int
     adapter: str
@@ -38,6 +39,10 @@ def load_settings() -> Settings:
         session_dir=Path(os.environ.get("SESSION_DIR", "/data/session")),
         out_dir=Path(os.environ.get("OUT_DIR_CONTAINER", "/out")),
         page_size=int(os.environ.get("PAGE_SIZE", "36")),
+        # The first page is spent before the user has confirmed the profile is
+        # the right one, and every post on it costs a thumbnail request. Keep
+        # it small; "Load more" is where a full page is asked for.
+        first_page_size=int(os.environ.get("FIRST_PAGE_SIZE", "3")),
         ig_min_interval=float(os.environ.get("IG_MIN_INTERVAL", "3")),
         ig_backoff=int(os.environ.get("IG_BACKOFF", "900")),
         adapter=os.environ.get("IG_ADAPTER", "real"),

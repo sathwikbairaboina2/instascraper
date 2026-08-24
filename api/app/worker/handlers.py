@@ -60,8 +60,12 @@ def handle_page_fetch(ctx: HandlerContext, payload: dict) -> None:
     if cursor == "":
         return  # exhausted; never hit Instagram again for this profile
 
+    # A null cursor means nothing has been indexed yet: take the cheap first
+    # page. Every later page is a deliberate "Load more".
+    limit = ctx.settings.first_page_size if cursor is None else ctx.settings.page_size
+
     ctx.pacer.wait()
-    page = ctx.adapter.fetch_page(username, cursor, ctx.settings.page_size)
+    page = ctx.adapter.fetch_page(username, cursor, limit)
 
     for post in page.posts:
         ctx.conn.execute(

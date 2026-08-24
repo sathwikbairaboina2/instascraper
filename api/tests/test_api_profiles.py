@@ -59,7 +59,7 @@ def test_media_page_returns_thumb_urls_and_total(client, conn, settings, adapter
 
     body = client.get("/api/profiles/nike/media?limit=2&offset=0").json()
 
-    assert body["total"] == settings.page_size
+    assert body["total"] == settings.first_page_size
     assert len(body["items"]) == 2
     assert body["items"][0]["thumb_url"].startswith("/api/media/")
     assert body["items"][0]["full_status"] == "none"
