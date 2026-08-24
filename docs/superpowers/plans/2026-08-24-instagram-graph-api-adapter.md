@@ -21,6 +21,11 @@
 - **`child_idx` convention:** `0` for a single-media post, `1..N` for carousel children. Matches `paths.full_filename` and `FakeAdapter`.
 - **The five-case error model does not grow.** Everything maps onto `IgNotFound`, `IgPrivate`, `IgRateLimited`, `IgChallenge`, `IgTransient`.
 - Work happens on branch `feat/graph-api-adapter`.
+- **Interpreter:** the system `python` has no pytest. Every `python` in this
+  plan means the project venv:
+  `C:/Users/sathwik/projects/instascraper/.venv/Scripts/python.exe`.
+  Run test commands from `api/` with an absolute interpreter path.
+- **Baseline before Task 1:** 152 tests passing.
 
 ---
 
@@ -1262,15 +1267,14 @@ Wires the new column into the worker so the adapter can be told what it needs.
 
 - [ ] **Step 1: Write the failing test**
 
-Append to `api/tests/test_handlers_profile.py`:
+Append to `api/tests/test_handlers_profile.py`. This file already provides a
+`ctx` fixture holding a bare `FakeAdapter`; use it rather than inventing one:
 
 ```python
-def test_page_fetch_persists_media_sources(ctx_factory, conn):
+def test_page_fetch_persists_media_sources(ctx):
     """The adapter cannot look a post up later, so the URLs are stored now."""
-    from app.ig import types as t
-    from app.worker.handlers import handle_page_fetch, handle_profile_sync
+    import json
 
-    ctx = ctx_factory()
     ctx.adapter.add_profile("nike", post_count=1)
     ctx.adapter.posts["nike"] = [
         t.IgPost(
@@ -1285,10 +1289,12 @@ def test_page_fetch_persists_media_sources(ctx_factory, conn):
             sources=(t.MediaSource(0, "https://cdn.test/full.jpg", "image/jpeg", False),),
         )
     ]
-    handle_profile_sync(ctx, {"username": "nike"})
-    handle_page_fetch(ctx, {"username": "nike"})
+    handlers.handle_profile_sync(ctx, {"username": "nike"})
+    handlers.handle_page_fetch(ctx, {"username": "nike"})
 
-    row = conn.execute("SELECT src_urls, src_urls_at FROM media_items WHERE shortcode='s1'").fetchone()
+    row = ctx.conn.execute(
+        "SELECT src_urls, src_urls_at FROM media_items WHERE shortcode='s1'"
+    ).fetchone()
     stored = json.loads(row["src_urls"])
     assert stored == [
         {"child_idx": 0, "url": "https://cdn.test/full.jpg", "mime": "image/jpeg", "is_video": False}
@@ -1296,19 +1302,34 @@ def test_page_fetch_persists_media_sources(ctx_factory, conn):
     assert row["src_urls_at"]
 ```
 
-Append to `api/tests/test_handlers_media.py`:
+Append to `api/tests/test_handlers_media.py`. This file builds its
+`HandlerContext` inline rather than through a factory fixture, so these
+tests do the same:
 
 ```python
-def test_media_fetch_hands_the_adapter_a_hint(ctx_factory, conn):
-    from app.ig import types as t
-    from app.worker.handlers import handle_media_fetch
+class Recording:
+    """Captures the hint the handler passes, and writes nothing."""
 
-    seen = {}
+    def __init__(self):
+        self.hint = "unset"
 
-    class Recording:
-        def fetch_media(self, shortcode, dest_dir, hint=None):
-            seen["hint"] = hint
-            return []
+    def fetch_media(self, shortcode, dest_dir, hint=None):
+        self.hint = hint
+        return []
+
+
+def recording_ctx(settings, conn, adapter):
+    return HandlerContext(
+        conn=conn,
+        adapter=adapter,
+        settings=settings,
+        pacer=Pacer(min_interval=0.0),
+        enqueue=lambda kind, payload: None,
+    )
+
+
+def test_media_fetch_hands_the_adapter_a_hint(settings, conn):
+    import json
 
     conn.execute(
         "INSERT INTO profiles (username, created_at) VALUES ('nike','2026-01-01T00:00:00+00:00')"
@@ -1324,24 +1345,16 @@ def test_media_fetch_hands_the_adapter_a_hint(ctx_factory, conn):
         ),
     )
 
-    ctx = ctx_factory(adapter=Recording())
-    handle_media_fetch(ctx, {"shortcode": "s1"})
+    adapter = Recording()
+    handlers.handle_media_fetch(recording_ctx(settings, conn, adapter), {"shortcode": "s1"})
 
-    hint = seen["hint"]
-    assert hint.username == "nike"
-    assert hint.sources == (t.MediaSource(0, "https://cdn/f.jpg", "image/jpeg", False),)
+    assert adapter.hint.username == "nike"
+    assert adapter.hint.sources == (
+        t.MediaSource(0, "https://cdn/f.jpg", "image/jpeg", False),
+    )
 
 
-def test_media_fetch_hint_is_empty_when_nothing_was_stored(ctx_factory, conn):
-    from app.worker.handlers import handle_media_fetch
-
-    seen = {}
-
-    class Recording:
-        def fetch_media(self, shortcode, dest_dir, hint=None):
-            seen["hint"] = hint
-            return []
-
+def test_media_fetch_hint_is_empty_when_nothing_was_stored(settings, conn):
     conn.execute(
         "INSERT INTO profiles (username, created_at) VALUES ('nike','2026-01-01T00:00:00+00:00')"
     )
@@ -1351,14 +1364,17 @@ def test_media_fetch_hint_is_empty_when_nothing_was_stored(ctx_factory, conn):
         " 'https://instagram.com/p/s2/','2026-01-01T00:00:00+00:00')"
     )
 
-    ctx = ctx_factory(adapter=Recording())
-    handle_media_fetch(ctx, {"shortcode": "s2"})
+    adapter = Recording()
+    handlers.handle_media_fetch(recording_ctx(settings, conn, adapter), {"shortcode": "s2"})
 
-    assert seen["hint"].sources == ()
-    assert seen["hint"].username == "nike"
+    assert adapter.hint.sources == ()
+    assert adapter.hint.username == "nike"
 ```
 
-Both files need `import json` at the top. If `ctx_factory` does not already exist in these test modules, reuse whatever `HandlerContext` construction they currently use — check the top of each file and follow the established pattern rather than inventing a new fixture.
+Both test modules already import `json`? They do not — add `import json` to
+the top of `test_handlers_media.py`. `test_handlers_profile.py` imports it
+locally inside the new test, as written above. Both files already import
+`handlers`, `HandlerContext`, `Pacer` and `t`, so no other imports change.
 
 - [ ] **Step 2: Run test to verify it fails**
 
