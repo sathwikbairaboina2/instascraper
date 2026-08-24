@@ -1,3 +1,5 @@
+from app.clock import now_iso
+from app.services import quota
 from app.worker import handlers
 from app.worker.pacer import Pacer
 from app.worker.runner import HandlerContext
@@ -100,3 +102,43 @@ def test_ensure_leaves_failed_alone_unless_retry(client, conn, settings, adapter
 
     assert body["statuses"] == {"nike-0": "queued"}
     assert conn.execute("SELECT COUNT(*) c FROM jobs").fetchone()["c"] == 1
+
+
+def test_ensure_refuses_a_reel_when_the_hourly_cap_is_spent(
+    client, conn, settings, adapter
+):
+    """Refuse where the click happens, rather than queueing a job to die."""
+    seed(conn, settings, adapter)
+    shortcode = conn.execute("SELECT shortcode FROM media_items LIMIT 1").fetchone()[0]
+    conn.execute(
+        "UPDATE media_items SET kind='reel', full_status='none' WHERE shortcode=?",
+        (shortcode,),
+    )
+    conn.execute("DELETE FROM jobs")
+    for _ in range(settings.reel_max_per_hour):
+        quota.record(conn, quota.REEL, now_iso())
+
+    body = client.post("/api/media/ensure", json={"shortcodes": [shortcode]}).json()
+
+    assert body["statuses"][shortcode] == "quota"
+    assert "cap spent" in body["errors"][shortcode]
+    assert conn.execute("SELECT COUNT(*) c FROM jobs").fetchone()["c"] == 0
+
+
+def test_ensure_still_queues_a_photo_when_the_reel_cap_is_spent(
+    client, conn, settings, adapter
+):
+    """The reel cap governs scraping, not everything the app does."""
+    seed(conn, settings, adapter)
+    shortcode = conn.execute(
+        "SELECT shortcode FROM media_items WHERE kind!='reel' LIMIT 1"
+    ).fetchone()[0]
+    conn.execute(
+        "UPDATE media_items SET full_status='none' WHERE shortcode=?", (shortcode,)
+    )
+    for _ in range(settings.reel_max_per_hour):
+        quota.record(conn, quota.REEL, now_iso())
+
+    body = client.post("/api/media/ensure", json={"shortcodes": [shortcode]}).json()
+
+    assert body["statuses"][shortcode] == "queued"

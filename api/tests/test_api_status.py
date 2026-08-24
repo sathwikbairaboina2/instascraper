@@ -120,3 +120,11 @@ def test_fake_data_never_reaches_the_graph_root(settings):
 def test_status_reports_no_usage_for_an_adapter_that_does_not_track_it(client):
     """The fake adapter never calls Meta; inventing a 0% would read as fact."""
     assert client.get("/api/status").json()["usage"] is None
+
+
+def test_status_reports_both_reel_windows(client):
+    body = client.get("/api/status").json()
+
+    assert body["reel_limits"]["hour"]["max"] == 20
+    assert body["reel_limits"]["day"]["max"] == 100
+    assert body["reel_limits"]["hour"]["used"] == 0

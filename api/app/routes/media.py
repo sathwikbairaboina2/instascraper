@@ -2,7 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
+from app.clock import now_iso
 from app.main_deps import get_conn_dep, wake_worker
+from app.services import quota
 from app.worker import queue
 
 router = APIRouter()
@@ -57,6 +59,23 @@ def get_full(
     )
 
 
+def _reel_cap_spent(conn, settings) -> str | None:
+    """The reason the next reel cannot be fetched, or None if it can.
+
+    Read-only: the ledger is spent by the downloader, never by a caller
+    deciding whether to offer the action.
+    """
+    now = now_iso()
+    for seconds, limit, label in (
+        (3600, settings.reel_max_per_hour, "hourly"),
+        (86400, settings.reel_max_per_day, "daily"),
+    ):
+        state = quota.window(conn, quota.REEL, seconds, limit, now)
+        if state["used"] >= limit:
+            return f"{label} reel cap spent ({state['used']}/{limit})"
+    return None
+
+
 @router.post("/media/ensure")
 def ensure(body: EnsureBody, request: Request, conn=Depends(get_conn_dep)):
     statuses: dict[str, str] = {}
@@ -65,7 +84,7 @@ def ensure(body: EnsureBody, request: Request, conn=Depends(get_conn_dep)):
 
     for shortcode in body.shortcodes:
         item = conn.execute(
-            "SELECT full_status, full_error FROM media_items WHERE shortcode=?",
+            "SELECT kind, full_status, full_error FROM media_items WHERE shortcode=?",
             (shortcode,),
         ).fetchone()
         if item is None:
@@ -80,6 +99,16 @@ def ensure(body: EnsureBody, request: Request, conn=Depends(get_conn_dep)):
             if status == "failed":
                 errors[shortcode] = item["full_error"] or "unknown error"
             continue
+
+        if item["kind"] == "reel":
+            settings = request.app.state.runtime.current.settings
+            spent = _reel_cap_spent(conn, settings)
+            if spent is not None:
+                # Refuse where the click happened. A job queued against a
+                # spent cap only fails later, somewhere nobody is looking.
+                statuses[shortcode] = "quota"
+                errors[shortcode] = spent
+                continue
 
         queue.enqueue_unique(conn, "media_fetch", {"shortcode": shortcode})
         conn.execute(

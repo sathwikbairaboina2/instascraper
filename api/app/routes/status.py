@@ -2,8 +2,10 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 from app import runtime as rt
+from app.clock import now_iso
 from app.ig.factory import make_adapter
 from app.main_deps import get_conn_dep
+from app.services import quota
 from app.worker import queue
 
 router = APIRouter()
@@ -16,6 +18,14 @@ def get_status(request: Request, conn=Depends(get_conn_dep)):
     # The fake adapter never calls Meta. A 0% there would read as a real
     # measurement rather than an absent one.
     usage = getattr(current.adapter, "usage", None)
+    # Our own ledger, so unlike Meta's quota the reset time is a fact rather
+    # than an estimate.
+    now = now_iso()
+    settings = current.settings
+    reel_limits = {
+        "hour": quota.window(conn, quota.REEL, 3600, settings.reel_max_per_hour, now),
+        "day": quota.window(conn, quota.REEL, 86400, settings.reel_max_per_day, now),
+    }
     return {
         "worker": "running" if worker is not None and worker.is_alive() else "stopped",
         "adapter": current.name,
@@ -23,6 +33,7 @@ def get_status(request: Request, conn=Depends(get_conn_dep)):
         "breaker": request.app.state.breaker.state(),
         "queue_depth": queue.depth(conn),
         "usage": usage,
+        "reel_limits": reel_limits,
     }
 
 
