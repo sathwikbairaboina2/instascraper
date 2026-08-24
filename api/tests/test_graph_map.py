@@ -151,3 +151,39 @@ def test_profile_carries_the_follower_count():
 def test_a_profile_without_a_follower_count_maps_to_zero():
     payload = {"business_discovery": {"username": "x", "id": "1", "media_count": 0}}
     assert graph_map.profile_from_payload(payload).followers_count == 0
+
+
+def test_a_reel_with_no_media_url_yields_no_sources():
+    """Business Discovery never returns media_url for a reel.
+
+    Verified live against thevarunmayya, nike and natgeo: FEED items always
+    carry it, REELS never do. An empty string here became a bare httpx
+    'Request URL is missing an http:// or https:// protocol'.
+    """
+    node = {
+        "media_type": "VIDEO",
+        "media_product_type": "REELS",
+        "thumbnail_url": "https://cdn/t.jpg",
+        "permalink": "https://www.instagram.com/reel/AAAAAAAAAAA/",
+        "timestamp": "2026-08-20T14:03:11+0000",
+    }
+    assert graph_map.post_from_node(node).sources == ()
+
+
+def test_a_carousel_keeps_the_children_that_do_have_urls():
+    """A slide without a url must not shift the others' child_idx."""
+    node = {
+        "media_type": "CAROUSEL_ALBUM",
+        "media_product_type": "FEED",
+        "permalink": "https://www.instagram.com/p/AAAAAAAAAAA/",
+        "timestamp": "2026-08-20T14:03:11+0000",
+        "children": {
+            "data": [
+                {"media_type": "IMAGE", "media_url": "https://cdn/a.jpg"},
+                {"media_type": "VIDEO", "thumbnail_url": "https://cdn/b.jpg"},
+                {"media_type": "IMAGE", "media_url": "https://cdn/c.jpg"},
+            ]
+        },
+    }
+    sources = graph_map.post_from_node(node).sources
+    assert [s.child_idx for s in sources] == [1, 3]

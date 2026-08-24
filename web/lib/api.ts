@@ -37,6 +37,9 @@ export type MediaSummary = {
   taken_at: string
   caption: string | null
   is_video: boolean
+  /** Carousel slides that are video, by child index. A carousel is never
+   *  is_video itself, so this is the only way to know. */
+  video_children: number[]
   child_count: number
   full_status: 'none' | 'queued' | 'fetching' | 'ready' | 'failed'
   full_error: string | null

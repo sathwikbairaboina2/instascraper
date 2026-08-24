@@ -128,3 +128,33 @@ def test_profile_detail_reports_the_follower_count(client, conn, settings, adapt
     body = client.get("/api/profiles/nike").json()
 
     assert body["followers_count"] == 99
+
+
+def test_media_summary_names_which_carousel_children_are_video(
+    client, conn, settings, adapter
+):
+    """A carousel is not a video, but a slide inside it can be.
+
+    The lightbox picked <video> or <img> from the post-level flag, so a video
+    slide in a carousel rendered as a broken image.
+    """
+    seed(client, conn, settings, adapter)
+    shortcode = conn.execute("SELECT shortcode FROM media_items LIMIT 1").fetchone()[0]
+    conn.execute(
+        "UPDATE media_items SET child_count=3, src_urls=? WHERE shortcode=?",
+        (
+            json.dumps(
+                [
+                    {"child_idx": 1, "url": "https://cdn/a.jpg", "mime": "image/jpeg", "is_video": False},
+                    {"child_idx": 2, "url": "https://cdn/b.mp4", "mime": "video/mp4", "is_video": True},
+                    {"child_idx": 3, "url": "https://cdn/c.jpg", "mime": "image/jpeg", "is_video": False},
+                ]
+            ),
+            shortcode,
+        ),
+    )
+
+    items = client.get("/api/profiles/nike/media").json()["items"]
+    item = next(i for i in items if i["shortcode"] == shortcode)
+
+    assert item["video_children"] == [2]

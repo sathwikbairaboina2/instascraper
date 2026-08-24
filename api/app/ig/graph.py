@@ -221,6 +221,16 @@ class GraphAdapter:
             page = self.fetch_page(hint.username, cursor, self._settings.page_size)
             for post in page.posts:
                 if post.shortcode == shortcode:
+                    if not post.sources:
+                        # Found it, and Meta published no file for it.
+                        # Business Discovery omits media_url for every reel,
+                        # so the video is not merely stale -- it was never
+                        # offered, and no retry will produce one.
+                        raise t.IgNotFound(
+                            f"Meta publishes no downloadable file for {shortcode}: "
+                            "Business Discovery returns only a thumbnail for a "
+                            "reel, never the video itself"
+                        )
                     return post.sources
             cursor = page.next_cursor
             if cursor is None:

@@ -50,6 +50,11 @@ export default function Lightbox({
   }, [step])
 
   const src = `/api/media/${item.shortcode}/full?child=${child}`
+  // A carousel is never is_video, but a slide inside it can be. Asking the
+  // post rendered every slide as an image and broke the video ones.
+  const childIsVideo = isCarousel
+    ? (item.video_children ?? []).includes(child)
+    : item.is_video
 
   return (
     <Modal
@@ -73,7 +78,7 @@ export default function Lightbox({
     >
       <Flex vertical align="center" gap={12} data-testid="lightbox">
         {ready ? (
-          item.is_video ? (
+          childIsVideo ? (
             <video data-testid="lightbox-video" src={src} controls autoPlay style={{ maxWidth: '100%', maxHeight: '72vh' }} />
           ) : (
             <img data-testid="lightbox-image" src={src} alt={item.shortcode} style={{ maxWidth: '100%', maxHeight: '72vh' }} />

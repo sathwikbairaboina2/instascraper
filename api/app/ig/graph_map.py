@@ -52,22 +52,36 @@ def _timestamp(raw: str) -> str:
 
 
 def _sources(node: dict) -> tuple[t.MediaSource, ...]:
+    """Every file Meta actually hands us a url for.
+
+    A source without a url is not a source. Business Discovery omits
+    `media_url` entirely for reels -- confirmed live against several
+    accounts -- and keeping an empty string here only defers the problem to
+    the http client, which reports it as a malformed url rather than as
+    something Meta declined to expose.
+
+    `child_idx` stays the position in the carousel, so dropping a slide
+    never renumbers the ones around it.
+    """
     children = _children(node)
     if children:
         return tuple(
             t.MediaSource(
                 child_idx=index,
-                url=child.get("media_url") or "",
+                url=child["media_url"],
                 mime=_mime(child.get("media_type", "")),
                 is_video=child.get("media_type") == "VIDEO",
             )
             for index, child in enumerate(children, start=1)
+            if child.get("media_url")
         )
     media_type = node.get("media_type", "")
+    if not node.get("media_url"):
+        return ()
     return (
         t.MediaSource(
             child_idx=0,
-            url=node.get("media_url") or "",
+            url=node["media_url"],
             mime=_mime(media_type),
             is_video=media_type == "VIDEO",
         ),

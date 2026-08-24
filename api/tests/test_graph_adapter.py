@@ -343,3 +343,39 @@ def test_the_backoff_guard_still_reads_the_peak(graph_settings):
 
     with pytest.raises(t.IgRateLimited):
         adapter.fetch_page("nike", "c", 3)
+
+
+def test_a_reel_reports_that_meta_publishes_no_file_for_it(graph_settings, tmp_path):
+    """A reel carries no downloadable url, and saying so is the whole job.
+
+    Left to fall through, the empty source list downloads nothing and marks
+    the post ready, or reaches httpx as a malformed url. Neither tells
+    anyone that Meta simply does not publish the video.
+    """
+    reel_page = {
+        "business_discovery": {
+            "media": {
+                "data": [
+                    {
+                        "id": "1",
+                        "caption": "a reel",
+                        "media_type": "VIDEO",
+                        "media_product_type": "REELS",
+                        "thumbnail_url": "https://cdn/t.jpg",
+                        "permalink": "https://www.instagram.com/reel/REELCODE123/",
+                        "timestamp": "2026-08-20T14:03:11+0000",
+                    }
+                ],
+                "paging": {"cursors": {"after": "C1"}},
+            }
+        },
+        "id": "SELF",
+    }
+    transport = Transport((200, {}, reel_page))
+    adapter = GraphAdapter(graph_settings, transport=transport, fetcher=Fetcher({}))
+    hint = t.MediaHint(username="nike", sources=(), captured_at="")
+
+    with pytest.raises(t.IgNotFound) as caught:
+        adapter.fetch_media("REELCODE123", tmp_path, hint)
+
+    assert "reel" in str(caught.value).lower()

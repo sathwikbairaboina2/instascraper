@@ -108,3 +108,35 @@ test('the lightbox swaps to full quality once the fetch lands', async ({ page })
     /\/api\/media\/nike-0\/full\?child=0/,
   )
 })
+
+test('a video slide inside a carousel previews as video, not a broken image', async ({
+  page,
+}) => {
+  // nike-6 is a three-slide carousel in the seed. A carousel is never
+  // is_video itself, so before video_children existed every slide rendered
+  // as an <img> and a video one showed a broken image.
+  await page.route('**/api/profiles/nike/media**', async (route) => {
+    const res = await route.fetch()
+    const body = await res.json()
+    body.items = body.items.map((i: Record<string, unknown>) =>
+      i.shortcode === 'nike-6'
+        ? { ...i, full_status: 'ready', video_children: [2] }
+        : i,
+    )
+    await route.fulfill({ response: res, json: body })
+  })
+
+  await page.goto('/p/nike')
+  await page.getByTestId('preview-nike-6').click()
+
+  await expect(page.getByTestId('lightbox-image')).toHaveAttribute('src', /child=1/)
+
+  await page.getByTestId('lightbox-next').click()
+
+  await expect(page.getByTestId('lightbox-video')).toBeVisible()
+  await expect(page.getByTestId('lightbox-image')).toHaveCount(0)
+
+  await page.getByTestId('lightbox-next').click()
+
+  await expect(page.getByTestId('lightbox-image')).toHaveAttribute('src', /child=3/)
+})
