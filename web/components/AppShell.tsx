@@ -195,6 +195,11 @@ export default function AppShell({
           </Text>
           <Segmented
             size="small"
+            // Switching is off for now: Graph is the only source in use. The
+            // control stays visible because naming the live dataset is the
+            // half that still earns its place. Re-enable by dropping
+            // `disabled` and restoring onChange.
+            disabled
             // No fallback: a control whose job is naming the live dataset
             // must not claim one before status has arrived.
             value={status?.adapter}

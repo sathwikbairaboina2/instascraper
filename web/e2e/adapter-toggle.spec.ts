@@ -1,5 +1,11 @@
 import { expect, test } from '@playwright/test'
 
+// The toggle is disabled while Graph is the only source in use, so these
+// three specs cannot drive it. Re-enable them together with the control:
+// drop `disabled` in AppShell and delete this skip.
+test.describe.configure({ mode: 'serial' })
+test.skip(true, 'adapter switching is disabled: Graph-only mode')
+
 // antd Segmented hides the real radio input, so clicks go to the visible
 // label and assertions go to the input, which is where checked state lives.
 // 'Graph' must be matched exactly: the theme picker in the same header
