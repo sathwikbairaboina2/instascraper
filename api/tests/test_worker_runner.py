@@ -202,3 +202,25 @@ def test_worker_picks_up_a_swapped_adapter_on_the_next_job(worker_env):
     worker.shutdown()
 
     assert seen == [first, second], "worker kept using the adapter it started with"
+
+
+def test_a_spent_local_cap_fails_the_job_without_tripping_the_breaker(worker_env):
+    """Our own limit is not Instagram refusing us.
+
+    Tripping the breaker here would stop Graph API work too, which has its
+    own quota and is nowhere near it.
+    """
+    settings, conn, adapter, breaker, pacer = worker_env
+
+    def handler(ctx, payload):
+        raise t.IgQuotaSpent(
+            "hourly reel cap spent", resets_at="2026-08-25T12:10:00+00:00"
+        )
+
+    queue.enqueue(conn, "profile_sync", {"username": "nike"})
+    _run(settings, adapter, breaker, pacer, {"profile_sync": handler}, conn)
+
+    row = conn.execute("SELECT status, error FROM jobs").fetchone()
+    assert row["status"] == "failed"
+    assert "cap spent" in row["error"]
+    assert breaker.state()["tripped"] is False

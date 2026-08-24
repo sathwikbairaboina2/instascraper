@@ -31,6 +31,19 @@ class IgChallenge(IgError):
     """Login challenge or dead session. Trips the breaker permanently."""
 
 
+class IgQuotaSpent(IgError):
+    """Our own cap, not Instagram's.
+
+    Terminal for this job and invisible to the breaker: backing off the
+    Graph API because a local scraping budget ran out would punish the one
+    path that is behaving.
+    """
+
+    def __init__(self, message: str, resets_at: str | None = None):
+        super().__init__(message)
+        self.resets_at = resets_at
+
+
 class IgTransient(IgError):
     """Network blip or 5xx. Retryable."""
 

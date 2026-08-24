@@ -119,6 +119,12 @@ class Worker(threading.Thread):
             queue.requeue(conn, job["id"])
             self._log(job, payload, started, "challenge")
             return
+        except t.IgQuotaSpent as exc:
+            # Our own budget, so the breaker stays out of it: Graph work has
+            # a separate quota and is nowhere near it.
+            queue.fail(conn, job["id"], str(exc), retryable=False)
+            self._log(job, payload, started, "quota_spent")
+            return
         except (t.IgNotFound, t.IgPrivate) as exc:
             queue.fail(conn, job["id"], str(exc), retryable=False)
             self._log(job, payload, started, "terminal")
