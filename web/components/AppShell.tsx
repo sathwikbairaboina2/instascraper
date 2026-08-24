@@ -195,7 +195,9 @@ export default function AppShell({
           </Text>
           <Segmented
             size="small"
-            value={status?.adapter ?? 'graph'}
+            // No fallback: a control whose job is naming the live dataset
+            // must not claim one before status has arrived.
+            value={status?.adapter}
             onChange={(v) => switchAdapter(v as string)}
             options={[
               { value: 'graph', label: 'Graph' },

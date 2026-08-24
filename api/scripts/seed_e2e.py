@@ -8,7 +8,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app import db
+from app import db, runtime
 from app.config import load_settings
 from app.ig.fake import seeded_adapter
 from app.worker import handlers
@@ -17,7 +17,11 @@ from app.worker.runner import HandlerContext
 
 
 def main() -> int:
-    settings = load_settings()
+    base = load_settings()
+    # The server derives the fake data root rather than using the configured
+    # paths directly. Seeding the base path would leave it reading an empty
+    # database next to a fully seeded one.
+    settings = runtime.settings_for(base, base.adapter)
     conn = db.get_conn(settings)
     db.init_schema(conn)
     for directory in (settings.media_dir, settings.out_dir):
