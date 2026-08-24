@@ -6,7 +6,7 @@ from fastapi import FastAPI
 
 from app import db
 from app.config import Settings, load_settings
-from app.ig.adapter import make_adapter
+from app.ig.factory import make_adapter
 from app.routes import activity as activity_routes
 from app.routes import downloads as download_routes
 from app.routes import health as health_routes

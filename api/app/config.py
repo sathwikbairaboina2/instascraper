@@ -50,7 +50,7 @@ def load_settings() -> Settings:
         first_page_size=int(os.environ.get("FIRST_PAGE_SIZE", "3")),
         ig_min_interval=float(os.environ.get("IG_MIN_INTERVAL", "3")),
         ig_backoff=int(os.environ.get("IG_BACKOFF", "900")),
-        adapter=os.environ.get("IG_ADAPTER", "real"),
+        adapter=os.environ.get("IG_ADAPTER", "graph"),
         anonymous=anonymous,
         max_sleep=float(os.environ.get("IG_MAX_SLEEP", "60")),
         graph_token=os.environ.get("IG_GRAPH_TOKEN", ""),

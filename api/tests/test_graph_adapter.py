@@ -262,3 +262,43 @@ def test_download_to_failure_is_transient(graph_settings, tmp_path):
     adapter = GraphAdapter(graph_settings, transport=Transport(), fetcher=Fetcher({}))
     with pytest.raises(t.IgTransient):
         adapter.download_to("https://cdn/gone.jpg", tmp_path / "x.jpg")
+
+
+def test_factory_returns_a_graph_adapter_by_default(graph_settings):
+    from app.ig.factory import make_adapter
+
+    assert isinstance(make_adapter(graph_settings), GraphAdapter)
+
+
+def test_factory_still_serves_the_seeded_fake_for_tests(settings):
+    from app.ig.factory import make_adapter
+    from app.ig.fake import FakeAdapter
+
+    adapter = make_adapter(settings)  # settings.adapter == "fake"
+    assert isinstance(adapter, FakeAdapter)
+    assert "nike" in adapter.profiles
+
+
+def test_graph_settings_are_read_from_the_environment(monkeypatch):
+    from app.config import load_settings
+
+    monkeypatch.setenv("IG_GRAPH_TOKEN", "T")
+    monkeypatch.setenv("IG_GRAPH_USER_ID", "U")
+    monkeypatch.setenv("IG_GRAPH_VERSION", "v99.0")
+    monkeypatch.setenv("IG_GRAPH_REFRESH_PAGES", "5")
+    monkeypatch.setenv("IG_GRAPH_USAGE_LIMIT", "70")
+
+    loaded = load_settings()
+
+    assert loaded.graph_token == "T"
+    assert loaded.graph_user_id == "U"
+    assert loaded.graph_version == "v99.0"
+    assert loaded.graph_refresh_pages == 5
+    assert loaded.graph_usage_limit == 70.0
+
+
+def test_adapter_defaults_to_graph(monkeypatch):
+    from app.config import load_settings
+
+    monkeypatch.delenv("IG_ADAPTER", raising=False)
+    assert load_settings().adapter == "graph"

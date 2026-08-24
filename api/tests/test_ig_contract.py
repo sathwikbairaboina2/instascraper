@@ -87,7 +87,7 @@ def test_seeded_adapter_is_shared_by_make_adapter(settings):
     If make_adapter() returns an empty FakeAdapter, a seeded database refers
     to posts the server has never heard of and every media_fetch fails.
     """
-    from app.ig.adapter import make_adapter
+    from app.ig.factory import make_adapter
     from app.ig.fake import seeded_adapter
 
     served = make_adapter(settings)
@@ -139,3 +139,22 @@ def test_fake_fetch_media_accepts_and_ignores_a_hint(tmp_path):
     hint = t.MediaHint(username="nike", sources=(), captured_at="2026-01-01T00:00:00+00:00")
     saved = fake.fetch_media("nike-0", tmp_path, hint)
     assert [s.child_idx for s in saved] == [0]
+
+
+def test_graph_adapter_satisfies_the_port(settings):
+    """Every method the worker calls must exist with the right arity."""
+    import inspect
+    from dataclasses import replace
+
+    from app.ig.graph import GraphAdapter
+
+    adapter = GraphAdapter(replace(settings, adapter="graph", graph_version="v99.0"))
+
+    for name in ("fetch_profile", "fetch_page", "fetch_media", "download_to", "login"):
+        assert callable(getattr(adapter, name)), f"GraphAdapter is missing {name}"
+
+    assert isinstance(adapter, t.IgAdapter)
+
+    # The hint is optional, so existing call sites keep working.
+    hint_param = inspect.signature(adapter.fetch_media).parameters["hint"]
+    assert hint_param.default is None

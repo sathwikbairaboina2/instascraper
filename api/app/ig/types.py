@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 
 class IgError(Exception):
@@ -103,6 +103,7 @@ class SavedFile:
     height: int | None
 
 
+@runtime_checkable
 class IgAdapter(Protocol):
     def fetch_profile(self, username: str) -> IgProfile: ...
 
