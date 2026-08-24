@@ -14,127 +14,176 @@ checking whether a bug is in the UI or in the data.
 ## Goal
 
 A control in the web UI that switches the running API between the `graph`
-and `fake` adapters, with each adapter keeping its own database and media
-cache so neither dataset contaminates the other.
+and `fake` adapters, with each adapter's data kept separate so neither
+dataset contaminates the other.
 
 ## Non-goals
 
 - Switching to a third adapter. There are two.
-- Migrating or merging data between the two roots.
+- Migrating or merging data between the two sources.
 - Editing `.env` from the UI. The toggle changes the running process and
   persists its own selection; nothing else about configuration is editable.
-- Per-adapter breaker history. A switch clears the breaker; see "Breaker".
+- Per-source breaker history. A switch clears the breaker; see "Breaker".
+- Viewing both datasets at once. Exactly one source is live at a time.
 
 ## Decisions taken during design
 
 Recorded because each closed off a plausible alternative:
 
-- **Separate data per adapter**, not a shared database and not a wipe on
-  switch. Both datasets persist; switching is lossless.
-- **Graph keeps the configured paths; fake nests beneath them.** Nothing
-  that exists today moves, and Docker volume mounts are unchanged.
+- **One database, rows tagged with a `source` column** — not separate
+  database files, and not a wipe on switch. Both datasets persist and
+  switching is lossless.
+- **A flag column on the existing tables**, not parallel `fake_*` tables.
+  One schema and one set of queries, each filtered, rather than a doubled
+  schema whose every statement picks a table name at runtime.
 - **The selection persists across restarts**, with `IG_ADAPTER` acting as
   the first-run default rather than the permanent authority.
 - **The control is always visible and asks for confirmation.** Seeing which
   dataset is live matters more than header tidiness; an accidental swap
   should be impossible.
 
-## Architecture
+## Schema
 
-New module `api/app/runtime.py`, four small pieces with one job each.
+This is the substance of the change. `source TEXT NOT NULL DEFAULT 'graph'`
+is added to five tables, and the keys that need to distinguish datasets
+become composite.
 
-### `Runtime`
+| Table | Today | Becomes |
+|---|---|---|
+| `profiles` | `PRIMARY KEY (username)` | `PRIMARY KEY (username, source)` |
+| `media_items` | `PRIMARY KEY (shortcode)` | `PRIMARY KEY (shortcode, source)` |
+| `media_files` | `UNIQUE(shortcode, role, child_idx)` | `UNIQUE(shortcode, source, role, child_idx)` |
+| `jobs` | — | `source` column, no key change |
+| `activity_log` | — | `source` column, no key change |
+
+Composite keys are not optional here. The fake dataset seeds `nike`, and
+`nike` is also the obvious real target, so the same username genuinely
+exists in both datasets. With a plain `source` column and an unchanged
+primary key, the second sync would overwrite the first.
+
+Foreign keys follow: `media_items` references `profiles(username, source)`
+and `media_files` references `media_items(shortcode, source)`. The index
+`idx_media_profile` gains `source` as its leading column.
+
+`jobs` carries `source` so that work enqueued while on fake is not executed
+against graph after a switch. `activity_log` carries it so the activity
+feed shows the dataset you are looking at.
+
+## Migration
+
+New installations get the new shape directly from `schema.sql`. Existing
+databases need a rebuild, because **SQLite cannot alter a primary key in
+place** — the existing `migrate()` helper only knows how to `ADD COLUMN`.
+
+Detection is straightforward: if `PRAGMA table_info(profiles)` reports no
+`source` column, the database predates this change.
+
+The rebuild runs once, inside a single transaction with foreign keys
+disabled, per affected table:
+
+1. `CREATE TABLE <name>_new (...)` in the new shape.
+2. `INSERT INTO <name>_new SELECT <columns>, 'graph' FROM <name>` — every
+   existing row is real data by definition, so it is tagged `graph`.
+3. `DROP TABLE <name>`, then `ALTER TABLE <name>_new RENAME TO <name>`.
+4. Recreate the table's indexes.
+
+Foreign keys are disabled for the duration and re-enabled after, so the
+intermediate states where a child points at a dropped parent are not
+rejected. Existing demo data survives, tagged `graph`.
+
+## Media on disk
+
+The flag separates rows; it cannot separate files. Media lives at
+`media_dir/<username>/<shortcode>/thumb.jpg`, and the avatar at
+`media_dir/<username>/avatar.jpg` — identical paths for fake `nike` and
+real `nike`. Without intervention the two datasets would overwrite each
+other's images while their rows stayed neatly separated.
+
+So the media **root** is resolved per source: graph writes to `media_dir`
+exactly as today, fake writes to `media_dir/fake`. Nothing that exists
+moves, and Docker volume mounts are unchanged.
+
+One helper, `media_root(settings, source)`, is the only new concept.
+Because `media_files.path` is already stored *relative to* `media_dir`, a
+fake row naturally records `fake/nike/.../thumb.jpg`, and the media-serving
+routes join it against `media_dir` and work unchanged. `out_dir` is not
+scoped: downloads are your export folder, holding files you named, not
+cache.
+
+## Runtime holder
+
+Settings no longer vary between sources — only the adapter and the source
+name do. So this stays small:
 
 ```python
 @dataclass(frozen=True)
 class Runtime:
-    name: str          # "graph" | "fake"
-    settings: Settings
+    name: str      # "graph" | "fake"
     adapter: object
 ```
 
-Frozen on purpose. A swap replaces one immutable triple in a single
-assignment, so there is no window in which the adapter is fake while the
-paths still point at the real database. Two separate mutable fields would
-have exactly that window, and the fake adapter would write into real data.
+`RuntimeConfig` holds one `Runtime`, exposes `.current`, and `.swap(new)`
+replaces it. `app.state.runtime` is added; `app.state.settings` stays
+exactly as it is, since settings are now constant for the process lifetime.
 
-### `RuntimeConfig`
+`Worker` takes the holder instead of a bare adapter and resolves
+`self.runtime.current` once at the top of each job. This is required
+because `Worker` caches `self.adapter` today (`runner.py:45`): reassigning
+`app.state.adapter` would change what the routes see while the worker
+thread kept using the old one, and the toggle would appear to work while
+doing nothing.
 
-The holder. `.current` returns the live `Runtime`; `.swap(new)` replaces
-it. It also retains `base` — the unmodified `load_settings()` result.
-
-Retaining the base is a correctness requirement, not bookkeeping: deriving
-fake paths from a runtime that is *already* fake would produce
-`/data/fake/fake/app.db`. Every derivation starts from the base.
-
-### `settings_for(base, name)`
-
-Path derivation.
-
-- `graph` returns `base` with `adapter="graph"`.
-- `fake` returns a copy with `adapter="fake"` and each cache path rewritten
-  as `p.parent / "fake" / p.name`:
-
-  | Setting | graph | fake |
-  |---|---|---|
-  | `db_path` | `/data/app.db` | `/data/fake/app.db` |
-  | `media_dir` | `/data/media` | `/data/fake/media` |
-  | `out_dir` | `/out` | `/out` — **not** rewritten |
-
-`out_dir` is your export folder, holding files you named and asked for. It
-is not cache, so it is shared.
-
-Because `settings_for` also sets `.adapter`, `make_adapter()` needs no
-change: it still branches on `settings.adapter`.
-
-### `read_selection(base)` / `write_selection(base, name)`
-
-A one-line state file at `base.db_path.parent / "adapter.state"`, resolved
-from the base so its location never depends on which adapter is active.
-
-It is deliberately **not** a SQLite row. Each adapter has its own database,
-so a selection stored in a database is circular — you cannot know which
-database to open until you have read the selection. Making the graph
-database a permanent control plane would mean opening real-data files
-during a purely fake session.
-
-`read_selection` falls back to `base.adapter` (i.e. `IG_ADAPTER`) when the
-file is missing or its contents are not one of the two known names.
-
-## Application wiring
-
-`app.state.settings` and `app.state.adapter` are replaced by
-`app.state.runtime`. Two sources of truth would drift the first time a new
-call site forgot one. The eight existing readers are converted:
-
-| File | Reads |
-|---|---|
-| `app/main_deps.py:13` | settings |
-| `app/routes/downloads.py:20` | settings |
-| `app/routes/media.py:28,49` | settings |
-| `app/routes/profiles.py:98,167` | settings |
-| `app/routes/status.py:14` | settings |
-| `app/routes/health.py:38` | adapter |
+A job already in flight completes against the source it started on, which
+is coherent — it finishes writing where it began.
 
 `create_app(settings=..., adapter=..., start_worker=...)` keeps its exact
-signature. `tests/conftest.py` and `tests/test_logging_json.py` inject both,
-and an explicitly injected adapter pins the runtime rather than being
-rebuilt from settings.
+signature; `tests/conftest.py` and `tests/test_logging_json.py` inject both,
+and an injected adapter pins the runtime.
 
-## Data flow
+## Threading the source through queries
 
-### Boot
+52 SQL statements live across seven files. That is the surface to audit,
+not the count to change — statements reading unscoped tables, and `sweep`
+(see below), stay as they are.
 
-1. `load_settings()` produces the base settings.
-2. `read_selection(base)` yields the active name.
-3. `settings_for(base, name)` yields the active settings.
-4. `make_adapter(active)` yields the adapter.
-5. `RuntimeConfig(base, Runtime(...))` is stored on `app.state.runtime`.
-6. The lifespan hook prepares the active data root: `mkdir`, `init_schema`,
-   `migrate`, `sweep`.
-7. The worker starts, holding the holder.
+| File | Statements |
+|---|---|
+| `app/worker/handlers.py` | 16 |
+| `app/routes/profiles.py` | 14 |
+| `app/worker/queue.py` | 11 |
+| `app/routes/media.py` | 4 |
+| `app/services/downloads.py` | 3 |
+| `app/worker/sweep.py` | 2 |
+| `app/services/activity.py` | 2 |
 
-### Switch — `POST /api/adapter`
+The source reaches them by the same route the connection already does:
+
+- **Routes** read `request.app.state.runtime.current.name`.
+- **Handlers** read `ctx.source`; `HandlerContext` gains the field, set by
+  the worker from the runtime it resolved for that job.
+- **Queue** takes source on `enqueue`, and filters on claim, so a worker
+  only ever picks up work belonging to the live source.
+- **Sweep stays source-agnostic, deliberately.** It resets rows stuck in
+  `fetching`/`queued` and jobs stuck in `running`, and it runs once at
+  startup — at which point nothing is in flight for *either* source, so
+  resetting both is the correct recovery rather than an oversight. Its
+  `*.part` cleanup walks `media_dir` recursively and therefore reaches
+  fake's files for free, since fake nests inside. Neither of its two
+  statements is scoped.
+
+## Selection persistence
+
+With a single database this is no longer circular, so it is simply a row.
+A small `app_state (key TEXT PRIMARY KEY, value TEXT)` table stores
+`adapter`. It is read at boot, after schema init and migration, and written
+on each successful switch. `IG_ADAPTER` applies only when no row exists.
+
+`app_state` needs no migration of its own. `init_schema` runs `schema.sql`
+on every boot and every statement there is `CREATE TABLE IF NOT EXISTS`, so
+an existing database gains the table the first time it starts on this
+version.
+
+## Switch — `POST /api/adapter`
 
 Request body `{"adapter": "graph" | "fake"}`, matching the field name
 `/status` already reports, so the same word means the same thing in both
@@ -143,46 +192,19 @@ directions.
 1. An unrecognised name is a 400.
 2. A name equal to the current one returns the current state unchanged, so
    the endpoint is idempotent.
-3. Build the new settings and adapter.
-4. Prepare the new data root: `mkdir`, `init_schema`, `migrate`, `sweep`.
+3. Build the new adapter.
+4. Ensure the new source's media root exists.
 5. Swap the runtime.
 6. Clear the breaker.
-7. Write the state file.
+7. Persist the selection.
 8. Return `{"adapter": name}`.
 
-The ordering carries the failure semantics. Everything that can fail
-happens before the swap; the swap itself is a single assignment and cannot
-fail, and only after it do we mutate anything else. A failed switch
-therefore leaves the process exactly where it was, with the breaker still
-reflecting the adapter still in use. The state file is written last —
-writing it earlier would let a crash in between persist a selection that
-never took effect, and the next boot would come up in a state the user
-never reached.
-
-## Worker interaction
-
-`Worker` takes the holder instead of a settings object and an adapter, and
-resolves `self.runtime.current` once at the top of each job.
-
-No coordination, locking or thread signalling is needed. `db.get_conn` is
-keyed by path (see below), so the worker lands on the new database by
-itself on its next job. A job already in flight completes against the root
-it started on, which is coherent — it finishes writing where it began.
-
-A consequence worth naming: the job queue is a table *inside* each
-database, so queues are per-dataset automatically. Switching to fake does
-not drain graph's pending work; it is still there on switching back.
-
-## The `db.get_conn` fix
-
-`db.get_conn()` caches one connection per thread and never re-checks
-`db_path`. Nothing changes that path today, so the bug is latent — but the
-moment it can change, the worker thread would keep writing to the old
-database forever.
-
-The thread-local cache becomes keyed by path: a request for a different
-`db_path` closes the cached connection and opens the new one. This is a
-correctness fix the feature depends on, not a refactor.
+Everything that can fail happens before the swap; the swap itself is a
+single assignment and cannot fail, and only after it does anything else
+mutate. A failed switch therefore leaves the process exactly where it was,
+with the breaker still reflecting the adapter still in use. The selection
+is persisted last, so a crash midway cannot record a choice that never took
+effect and strand the next boot in a state the user never reached.
 
 ## Breaker
 
@@ -203,31 +225,34 @@ dead, the next graph call trips it again immediately.
 the live dataset, wrapped in a `Popconfirm`. The confirmation text states
 that the app will reload and that the other dataset is kept, not deleted.
 
-On success the handler navigates to `/` and reloads the page. Every piece
-of data on screen came from a database that is no longer live, and a reload
-is both simpler and more reliable than invalidating each cache and polling
-hook by hand. `/` is also the correct destination rather than merely the
-convenient one: the profile currently being viewed may not exist in the
-other dataset.
+On success the handler navigates to `/` and reloads. Every piece of data on
+screen came from a source that is no longer live, and a reload is both
+simpler and more reliable than invalidating each cache and polling hook by
+hand. `/` is also the correct destination rather than the convenient one:
+the profile being viewed may not exist in the other dataset.
 
 ## Testing
 
-**`runtime.py`, pure and unit-tested:** graph settings pass through
-unchanged; fake nests `db_path` and `media_dir`; `out_dir` is untouched;
-deriving from the base twice never yields `fake/fake`. State file
-round-trips, and falls back to `IG_ADAPTER` both when the file is absent
-and when its contents are unrecognised.
+**Migration, the highest-risk piece.** Build a database in the old shape,
+populate it, migrate, and assert: every pre-existing row is tagged `graph`,
+nothing was lost, the new keys and indexes exist, and running the migration
+twice is a no-op.
 
-**`db.get_conn` re-keying:** two different `db_path` values on one thread
-yield different connections, and the superseded one is closed.
+**Isolation, the property that matters.** Sync `nike` under both sources
+and assert two distinct profile rows coexist, that each source's queries
+return only its own rows, and that fake media files land under
+`media_dir/fake` while graph's stay at the top level.
 
-**Endpoint:** unknown name is a 400; the same name is idempotent; a switch
-changes what `/status` reports; a write performed while on fake lands in
-the nested database and not the base one; the breaker is cleared.
+**Queue scoping.** A job enqueued while on fake is not claimed by a worker
+running as graph.
 
-**Regression guard:** `tests/conftest.py` already injects `settings=` and
-`adapter=` into `create_app`. The whole existing suite passing is the proof
-that the signature and injection still work.
+**Endpoint.** Unknown name is a 400; the same name is idempotent; a switch
+changes what `/status` reports; the breaker is cleared.
+
+**Regression guard.** `tests/conftest.py` already injects `settings=` and
+`adapter=` into `create_app`, and the existing suite covers the unscoped
+behaviour. That suite passing unchanged — with every query now carrying a
+source — is the proof that scoping did not alter single-source behaviour.
 
 **e2e:** one new spec, deterministic and network-free. The suite runs on
 fake; switching *to* graph with no token configured makes `GraphAdapter`
@@ -235,20 +260,19 @@ raise `IgChallenge` before any HTTP call, so the banner reads "Graph API
 token not configured". That exercises control, confirmation, endpoint,
 swap, reload and banner without touching the network.
 
-To confirm during implementation rather than assume: `scripts/e2e-native.sh`
-pins `DB_PATH` and `MEDIA_DIR` explicitly, so `seed_e2e.py` and the running
-server must agree on the derived fake location. Both call the same
-derivation, so they should — verify it.
-
 ## Success criteria
 
 1. The header shows which dataset is live, and switching requires a
    confirmation.
 2. Switching to fake shows the seeded dataset; switching back to graph
    shows the real one, unchanged and not re-synced.
-3. Nothing written while on fake appears anywhere under the graph paths.
-4. The selection survives an API restart; `IG_ADAPTER` applies only when no
+3. The same username can exist under both sources without either
+   overwriting the other, in the database and on disk.
+4. Work queued under one source is never executed under the other.
+5. The selection survives an API restart; `IG_ADAPTER` applies only when no
    selection has ever been made.
-5. A tripped breaker does not follow the user across a switch.
-6. The full backend suite and all Playwright specs pass with no network
+6. An existing database migrates with every row preserved and tagged
+   `graph`.
+7. A tripped breaker does not follow the user across a switch.
+8. The full backend suite and all Playwright specs pass with no network
    access.
