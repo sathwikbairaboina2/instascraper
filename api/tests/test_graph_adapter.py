@@ -428,3 +428,89 @@ def test_a_source_with_no_url_never_reaches_the_fetcher(graph_settings, tmp_path
 
     assert asked == [], f"downloaded from a urlless source: {asked}"
     assert "reel" in str(caught.value).lower()
+
+
+class FakeReels:
+    def __init__(self, saved=None, raises=None):
+        self.saved, self.raises, self.calls = saved, raises, []
+
+    def download(self, shortcode, dest):
+        self.calls.append((shortcode, dest))
+        if self.raises:
+            raise self.raises
+        return self.saved
+
+
+def _reel_page():
+    return {
+        "business_discovery": {
+            "media": {
+                "data": [
+                    {
+                        "id": "1",
+                        "media_type": "VIDEO",
+                        "media_product_type": "REELS",
+                        "thumbnail_url": "https://cdn/t.jpg",
+                        "permalink": "https://www.instagram.com/reel/REELCODE123/",
+                        "timestamp": "2026-08-20T14:03:11+0000",
+                    }
+                ],
+                "paging": {"cursors": {"after": "C1"}},
+            }
+        },
+        "id": "SELF",
+    }
+
+
+def test_a_reel_falls_back_to_the_downloader(graph_settings, tmp_path):
+    saved = t.SavedFile(
+        child_idx=0, path=tmp_path / "full.mp4", mime="video/mp4", bytes=7,
+        width=None, height=None,
+    )
+    reels = FakeReels(saved=saved)
+    adapter = GraphAdapter(
+        graph_settings,
+        transport=Transport((200, {}, _reel_page())),
+        fetcher=Fetcher({}),
+        reel_downloader=reels,
+    )
+    hint = t.MediaHint(username="nike", sources=(), captured_at="")
+
+    result = adapter.fetch_media("REELCODE123", tmp_path, hint)
+
+    assert result == [saved]
+    assert reels.calls[0][0] == "REELCODE123"
+
+
+def test_the_downloader_is_never_asked_when_graph_has_a_url(graph_settings, tmp_path):
+    """The fallback exists for what Graph cannot serve, and nothing else."""
+    reels = FakeReels()
+    adapter = GraphAdapter(
+        graph_settings,
+        transport=Transport(),
+        fetcher=Fetcher({"https://cdn/i.jpg": b"IMG"}),
+        reel_downloader=reels,
+    )
+    hint = t.MediaHint(
+        username="nike",
+        sources=(t.MediaSource(0, "https://cdn/i.jpg", "image/jpeg", False),),
+        captured_at="",
+    )
+
+    adapter.fetch_media("AAAAAAAAAAA", tmp_path, hint)
+
+    assert reels.calls == []
+
+
+def test_without_a_downloader_a_reel_still_explains_itself(graph_settings, tmp_path):
+    adapter = GraphAdapter(
+        graph_settings,
+        transport=Transport((200, {}, _reel_page())),
+        fetcher=Fetcher({}),
+    )
+    hint = t.MediaHint(username="nike", sources=(), captured_at="")
+
+    with pytest.raises(t.IgNotFound) as caught:
+        adapter.fetch_media("REELCODE123", tmp_path, hint)
+
+    assert "reel" in str(caught.value).lower()

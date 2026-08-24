@@ -122,10 +122,14 @@ def _httpx_fetcher(url: str) -> tuple[int, bytes]:
 class GraphAdapter:
     """Reads public Business and Creator accounts via Business Discovery."""
 
-    def __init__(self, settings: Settings, transport=None, fetcher=None):
+    def __init__(
+        self, settings: Settings, transport=None, fetcher=None, reel_downloader=None
+    ):
         self._settings = settings
         self._transport = transport or _httpx_transport
         self._fetcher = fetcher or _httpx_fetcher
+        # Present only for the gap Business Discovery leaves: reel video.
+        self._reels = reel_downloader
         self._usage = 0.0
         self._usage_peak = 0.0
 
@@ -201,6 +205,17 @@ class GraphAdapter:
         sources = tuple(s for s in hint.sources if s.url) if hint else ()
         if not sources:
             sources = self._refresh(shortcode, hint)
+        if not sources:
+            if self._reels is not None:
+                # Business Discovery publishes a thumbnail for a reel and
+                # keeps the video. This is the only path in the app that
+                # asks instagram.com directly, and only for that gap.
+                return [self._reels.download(shortcode, dest_dir / "full.mp4")]
+            raise t.IgNotFound(
+                f"Meta publishes no downloadable file for {shortcode}: "
+                "Business Discovery returns only a thumbnail for a reel, "
+                "never the video itself"
+            )
         try:
             return self._download_all(sources, dest_dir)
         except _Stale:
@@ -225,16 +240,9 @@ class GraphAdapter:
             page = self.fetch_page(hint.username, cursor, self._settings.page_size)
             for post in page.posts:
                 if post.shortcode == shortcode:
-                    if not post.sources:
-                        # Found it, and Meta published no file for it.
-                        # Business Discovery omits media_url for every reel,
-                        # so the video is not merely stale -- it was never
-                        # offered, and no retry will produce one.
-                        raise t.IgNotFound(
-                            f"Meta publishes no downloadable file for {shortcode}: "
-                            "Business Discovery returns only a thumbnail for a "
-                            "reel, never the video itself"
-                        )
+                    # Found. Empty means Meta published no file for it, which
+                    # is a fallback opportunity rather than an error, so the
+                    # judgement belongs to the caller.
                     return post.sources
             cursor = page.next_cursor
             if cursor is None:
