@@ -29,7 +29,6 @@ import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 
 import { clearBreaker, getProfiles, getStatus, setAdapter, syncProfile } from '@/lib/api'
-import { THEMES } from '@/lib/themes'
 import { usePolling } from '@/lib/usePolling'
 import { useThemePref } from './ThemeProvider'
 
@@ -44,7 +43,7 @@ export default function AppShell({
   children: React.ReactNode
 }) {
   const { token } = theme.useToken()
-  const { themed, dark, setThemeName, setDark } = useThemePref()
+  const { dark, setDark } = useThemePref()
   const router = useRouter()
   const [lookup, setLookup] = useState('')
 
@@ -172,25 +171,7 @@ export default function AppShell({
             borderBottom: `1px solid ${token.colorBorderSecondary}`,
           }}
         >
-          <Text type="secondary" style={{ fontSize: 11, letterSpacing: '.06em' }}>THEME</Text>
-          <Segmented
-            size="small"
-            value={themed.name}
-            onChange={(v) => setThemeName(v as string)}
-            options={THEMES.map((t) => ({
-              value: t.name,
-              label: (
-                <Flex align="center" gap={6} style={{ padding: '0 2px' }}>
-                  <span style={{ width: 9, height: 9, borderRadius: 999, background: t.accent }} />
-                  {t.name}
-                </Flex>
-              ),
-            }))}
-          />
-          <Text
-            type="secondary"
-            style={{ fontSize: 11, letterSpacing: '.06em', marginLeft: 16 }}
-          >
+          <Text type="secondary" style={{ fontSize: 11, letterSpacing: '.06em' }}>
             DATA
           </Text>
           <Segmented
