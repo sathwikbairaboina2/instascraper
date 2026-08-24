@@ -35,6 +35,7 @@ import {
 import { use, useCallback, useEffect, useMemo, useState } from 'react'
 
 import AppShell from '@/components/AppShell'
+import ProfileHeader from '@/components/ProfileHeader'
 import Lightbox from '@/components/Lightbox'
 import MediaTile from '@/components/MediaTile'
 import SelectionBar from '@/components/SelectionBar'
@@ -167,63 +168,50 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
 
   return (
     <AppShell active={username}>
-      <Flex
-        align="center"
-        gap={12}
-        style={{
-          height: 56,
-          padding: '0 16px',
-          flex: 'none',
-          background: token.colorBgContainer,
-          borderBottom: `1px solid ${token.colorBorderSecondary}`,
-        }}
-      >
-        <Avatar size={32} src={profile?.avatar_url} />
-        <Text strong style={{ fontSize: 18, letterSpacing: '-0.02em' }}>{username}</Text>
-        <Tag variant="filled" style={{ background: token.colorFillSecondary }}>
-          {profile?.post_count ?? 0} posts
-        </Tag>
-        <Tag variant="filled" color={token.colorPrimary}>
-          <span style={{ fontWeight: 600 }}>{profile?.cached_count ?? 0} cached</span>
-        </Tag>
-        <div style={{ flex: 1 }} />
-        <Button
-          type="text"
-          data-testid="track-toggle"
-          icon={profile?.tracked ? <StarFilled /> : <StarOutlined />}
-          style={{ color: profile?.tracked ? token.colorWarning : undefined }}
-          onClick={async () => {
-            await setTracked(username, !profile?.tracked)
-            refreshProfile()
-          }}
-        >
-          {profile?.tracked ? 'Tracked' : 'Track'}
-        </Button>
-        <Tooltip title="Refresh now">
+      <ProfileHeader
+        profile={profile}
+        indexed={media?.total ?? 0}
+        actions={
+          <>
           <Button
-            shape="circle"
-            data-testid="refresh"
-            icon={<ReloadOutlined />}
-            onClick={() => {
+            type="text"
+            data-testid="track-toggle"
+            icon={profile?.tracked ? <StarFilled /> : <StarOutlined />}
+            style={{ color: profile?.tracked ? token.colorWarning : undefined }}
+            onClick={async () => {
+              await setTracked(username, !profile?.tracked)
               refreshProfile()
-              refreshMedia()
             }}
-          />
-        </Tooltip>
-        <Button
-          type="text"
-          data-testid="clear-cache"
-          icon={<ClearOutlined />}
-          onClick={async () => {
-            await clearCache(username)
-            selection.clear()
-            refreshMedia()
-            refreshProfile()
-          }}
-        >
-          Clear cache
-        </Button>
-      </Flex>
+          >
+            {profile?.tracked ? 'Tracked' : 'Track'}
+          </Button>
+          <Tooltip title="Refresh now">
+            <Button
+              shape="circle"
+              data-testid="refresh"
+              icon={<ReloadOutlined />}
+              onClick={() => {
+                refreshProfile()
+                refreshMedia()
+              }}
+            />
+          </Tooltip>
+          <Button
+            type="text"
+            data-testid="clear-cache"
+            icon={<ClearOutlined />}
+            onClick={async () => {
+              await clearCache(username)
+              selection.clear()
+              refreshMedia()
+              refreshProfile()
+            }}
+          >
+            Clear cache
+          </Button>
+          </>
+        }
+      />
 
       <Flex
         align="center"

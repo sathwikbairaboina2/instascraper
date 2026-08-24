@@ -24,6 +24,7 @@ export type ProfileSummary = {
 
 export type ProfileDetail = ProfileSummary & {
   biography: string | null
+  followers_count: number | null
   is_private: boolean
   tracked: boolean
   exhausted: boolean
