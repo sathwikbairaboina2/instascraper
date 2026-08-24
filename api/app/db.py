@@ -45,3 +45,25 @@ def reset_thread_state() -> None:
 
 def init_schema(conn: sqlite3.Connection) -> None:
     conn.executescript(_SCHEMA_PATH.read_text())
+
+
+# SQLite has no ADD COLUMN IF NOT EXISTS, and schema.sql only ever creates
+# tables that do not already exist. Columns added to an existing table
+# therefore need this. Keyed by table, then by column.
+_ADDED_COLUMNS = {
+    "media_items": {
+        "src_urls": "ALTER TABLE media_items ADD COLUMN src_urls TEXT",
+        "src_urls_at": "ALTER TABLE media_items ADD COLUMN src_urls_at TEXT",
+    },
+}
+
+
+def migrate(conn: sqlite3.Connection) -> None:
+    """Bring an existing database up to the current schema. Idempotent."""
+    for table, columns in _ADDED_COLUMNS.items():
+        existing = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
+        if not existing:
+            continue  # table does not exist yet; schema.sql just created it
+        for name, ddl in columns.items():
+            if name not in existing:
+                conn.execute(ddl)

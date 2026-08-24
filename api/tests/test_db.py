@@ -34,3 +34,28 @@ def test_media_files_cascade_on_item_delete(conn):
     )
     conn.execute("DELETE FROM media_items WHERE shortcode='S1'")
     assert conn.execute("SELECT COUNT(*) c FROM media_files").fetchone()["c"] == 0
+
+
+def test_migrate_adds_src_url_columns_to_an_old_database(settings):
+    conn = db.new_conn(settings)
+    conn.execute(
+        "CREATE TABLE media_items ("
+        " shortcode TEXT PRIMARY KEY, username TEXT NOT NULL, kind TEXT NOT NULL,"
+        " taken_at TEXT NOT NULL, caption TEXT, is_video INTEGER NOT NULL,"
+        " child_count INTEGER NOT NULL DEFAULT 1, full_status TEXT NOT NULL DEFAULT 'none',"
+        " full_error TEXT, ig_url TEXT NOT NULL, discovered_at TEXT NOT NULL)"
+    )
+
+    db.migrate(conn)
+
+    columns = {row["name"] for row in conn.execute("PRAGMA table_info(media_items)")}
+    assert "src_urls" in columns
+    assert "src_urls_at" in columns
+    conn.close()
+
+
+def test_migrate_is_idempotent(conn):
+    db.migrate(conn)
+    db.migrate(conn)
+    columns = {row["name"] for row in conn.execute("PRAGMA table_info(media_items)")}
+    assert "src_urls" in columns

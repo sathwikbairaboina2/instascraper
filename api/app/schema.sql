@@ -23,6 +23,8 @@ CREATE TABLE IF NOT EXISTS media_items (
   full_status   TEXT NOT NULL DEFAULT 'none',
   full_error    TEXT,
   ig_url        TEXT NOT NULL,
+  src_urls      TEXT,
+  src_urls_at   TEXT,
   discovered_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_media_profile ON media_items(username, taken_at DESC);
