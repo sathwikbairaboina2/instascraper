@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from app import runtime
+from app import db, runtime
 
 
 def test_graph_keeps_the_configured_paths(settings):
@@ -65,3 +65,54 @@ def test_fixed_holder_helper(settings):
     assert holder.current.name == "fake"
     assert holder.current.adapter == "A"
     assert holder.base is settings
+
+
+def test_selection_round_trips(settings):
+    runtime.write_selection(settings, "fake")
+    assert runtime.read_selection(settings) == "fake"
+
+
+def test_missing_state_file_falls_back_to_the_env_default(settings):
+    base = replace(settings, adapter="graph")
+    assert not runtime.state_path(base).exists()
+    assert runtime.read_selection(base) == "graph"
+
+
+def test_unrecognised_state_file_falls_back_to_the_env_default(settings):
+    base = replace(settings, adapter="graph")
+    path = runtime.state_path(base)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("instaloader", encoding="utf-8")
+    assert runtime.read_selection(base) == "graph"
+
+
+def test_state_file_location_does_not_depend_on_the_active_adapter(settings):
+    """It is resolved from the base, so fake and graph agree on where it is."""
+    fake = runtime.settings_for(settings, "fake")
+    assert runtime.state_path(settings) != runtime.state_path(fake)
+    # ...which is exactly why callers must pass the base, never the derived.
+    runtime.write_selection(settings, "fake")
+    assert runtime.read_selection(settings) == "fake"
+
+
+def test_prepare_data_root_creates_a_usable_database(settings):
+    target = runtime.settings_for(settings, "fake")
+    runtime.prepare_data_root(target)
+
+    assert target.db_path.exists()
+    assert target.media_dir.exists()
+
+    conn = db.new_conn(target)
+    tables = {
+        row["name"]
+        for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
+    }
+    conn.close()
+    assert {"profiles", "media_items", "media_files", "jobs"} <= tables
+
+
+def test_prepare_data_root_is_idempotent(settings):
+    target = runtime.settings_for(settings, "fake")
+    runtime.prepare_data_root(target)
+    runtime.prepare_data_root(target)
+    assert target.db_path.exists()

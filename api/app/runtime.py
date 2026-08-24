@@ -8,9 +8,12 @@ filesystem rather than by every query remembering to filter.
 from dataclasses import dataclass, replace
 from pathlib import Path
 
+from app import db
 from app.config import Settings
+from app.worker import sweep as sweep_module
 
 NAMES = ("graph", "fake")
+_STATE_FILE = "adapter.state"
 
 
 @dataclass(frozen=True)
@@ -64,3 +67,44 @@ class RuntimeConfig:
     def fixed(cls, settings: Settings, adapter, name: str = "fake") -> "RuntimeConfig":
         """Test helper: a holder pinned to one adapter."""
         return cls(settings, Runtime(name, settings, adapter))
+
+
+def state_path(base: Settings) -> Path:
+    """Where the selection lives. Always resolved from the base settings.
+
+    Not a SQLite row: each adapter has its own database, so a selection
+    stored in one is circular -- you cannot know which database to open
+    until you have read the selection.
+    """
+    return base.db_path.parent / _STATE_FILE
+
+
+def read_selection(base: Settings) -> str:
+    try:
+        name = state_path(base).read_text(encoding="utf-8").strip()
+    except OSError:
+        name = ""
+    if name in NAMES:
+        return name
+    return base.adapter if base.adapter in NAMES else "graph"
+
+
+def write_selection(base: Settings, name: str) -> None:
+    path = state_path(base)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(name, encoding="utf-8")
+
+
+def prepare_data_root(settings: Settings) -> dict:
+    """Make a data root usable: directories, schema, migration, recovery."""
+    settings.db_path.parent.mkdir(parents=True, exist_ok=True)
+    for directory in (settings.media_dir, settings.out_dir):
+        directory.mkdir(parents=True, exist_ok=True)
+
+    conn = db.new_conn(settings)
+    try:
+        db.init_schema(conn)
+        db.migrate(conn)
+        return sweep_module.sweep(conn, settings.media_dir)
+    finally:
+        conn.close()
