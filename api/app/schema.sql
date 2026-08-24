@@ -65,3 +65,11 @@ CREATE TABLE IF NOT EXISTS activity_log (
   detail  TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_activity_ts ON activity_log(ts DESC);
+
+CREATE TABLE IF NOT EXISTS quota_events (
+  id    INTEGER PRIMARY KEY,
+  kind  TEXT NOT NULL,
+  at    TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS quota_events_kind_at ON quota_events(kind, at);

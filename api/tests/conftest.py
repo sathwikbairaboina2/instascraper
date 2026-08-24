@@ -26,6 +26,10 @@ def settings(tmp_path: Path) -> Settings:
         graph_version="v99.0",
         graph_refresh_pages=2,
         graph_usage_limit=90.0,
+        reel_max_per_hour=20,
+        reel_max_per_day=100,
+        reel_timeout=5.0,
+        reel_min_interval=0.0,
     )
 
 

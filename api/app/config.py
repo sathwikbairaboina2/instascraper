@@ -19,6 +19,10 @@ class Settings:
     graph_version: str
     graph_refresh_pages: int
     graph_usage_limit: float
+    reel_max_per_hour: int
+    reel_max_per_day: int
+    reel_timeout: float
+    reel_min_interval: float
 
 
 def load_settings() -> Settings:
@@ -46,4 +50,12 @@ def load_settings() -> Settings:
         # How many pages deep to look when refreshing an expired media url.
         graph_refresh_pages=int(os.environ.get("IG_GRAPH_REFRESH_PAGES", "2")),
         graph_usage_limit=float(os.environ.get("IG_GRAPH_USAGE_LIMIT", "90")),
+        # Our own caps on scraping instagram.com for reel video, which the
+        # Graph API will not serve. Conservative rather than authoritative:
+        # Instagram publishes no thresholds, so these are a footprint we
+        # chose, not a line anyone drew for us.
+        reel_max_per_hour=int(os.environ.get("IG_REEL_MAX_PER_HOUR", "20")),
+        reel_max_per_day=int(os.environ.get("IG_REEL_MAX_PER_DAY", "100")),
+        reel_timeout=float(os.environ.get("IG_REEL_TIMEOUT", "120")),
+        reel_min_interval=float(os.environ.get("IG_REEL_MIN_INTERVAL", "20")),
     )
