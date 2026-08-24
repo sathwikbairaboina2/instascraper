@@ -58,10 +58,30 @@ export type RecreateItem = {
   username: string
   ig_url: string
   caption: string | null
-  status: 'selected' | 'submitted' | 'done' | 'failed'
+  status: 'selected' | 'prepared' | 'submitted' | 'done' | 'failed'
   error: string | null
   added_at: string
+  prepared_at: string | null
+  payload: RecreatePayload | null
   thumb_url: string
+}
+
+export type RecreatePayload = {
+  shortcode: string
+  username: string
+  ig_url: string
+  caption: string | null
+  kind: string
+  taken_at: string
+  prepared_at: string
+  slides: {
+    index: number
+    path: string
+    mime: string
+    bytes: number
+    width: number | null
+    height: number | null
+  }[]
 }
 
 export type MediaPage = { items: MediaSummary[]; total: number; exhausted: boolean }
@@ -159,4 +179,9 @@ export const markRecreate = (shortcodes: string[]) =>
 export const unmarkRecreate = (shortcode: string) =>
   call<{ removed: number }>(`/api/recreate/${encodeURIComponent(shortcode)}`, {
     method: 'DELETE',
+  })
+export const prepareRecreate = (shortcode: string, slides: number[] | null) =>
+  call<RecreatePayload>(`/api/recreate/${encodeURIComponent(shortcode)}/prepare`, {
+    method: 'POST',
+    body: JSON.stringify({ slides }),
   })

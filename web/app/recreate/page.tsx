@@ -19,6 +19,7 @@ type Status = RecreateItem['status']
  *  not exist yet, so there is nothing to invent states for. */
 const TABS: { key: Status; label: string }[] = [
   { key: 'selected', label: 'Selected' },
+  { key: 'prepared', label: 'Prepared' },
   { key: 'submitted', label: 'Submitted' },
   { key: 'done', label: 'Done' },
   { key: 'failed', label: 'Failed' },
@@ -72,7 +73,13 @@ export default function RecreatePage() {
   const [tab, setTab] = useState<Status>('selected')
 
   const counts = useMemo(() => {
-    const out: Record<Status, number> = { selected: 0, submitted: 0, done: 0, failed: 0 }
+    const out: Record<Status, number> = {
+      selected: 0,
+      prepared: 0,
+      submitted: 0,
+      done: 0,
+      failed: 0,
+    }
     for (const item of items) out[item.status] += 1
     return out
   }, [items])

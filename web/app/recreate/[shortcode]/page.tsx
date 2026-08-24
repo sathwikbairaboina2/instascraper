@@ -1,17 +1,28 @@
 'use client'
 
-import { ArrowLeftOutlined, LinkOutlined } from '@ant-design/icons'
-import { Alert, Button, Flex, Layout, Tag, Typography } from 'antd'
+import { ArrowLeftOutlined, CheckOutlined, LinkOutlined } from '@ant-design/icons'
+import { Alert, Button, Flex, Layout, Spin, Tag, Typography } from 'antd'
 import Link from 'next/link'
-import { use } from 'react'
+import { use, useEffect, useState } from 'react'
 
 import AppShell from '@/components/AppShell'
 import { useThemePref } from '@/components/ThemeProvider'
-import { getRecreateItem } from '@/lib/api'
+import {
+  ensureMedia,
+  getMedia,
+  getRecreateItem,
+  prepareRecreate,
+  type MediaSummary,
+  type RecreatePayload,
+} from '@/lib/api'
 import { usePolling } from '@/lib/usePolling'
 
 const { Content } = Layout
 const { Text, Title } = Typography
+
+type Phase = 'idle' | 'fetching' | 'preparing' | 'done' | 'error'
+
+const POLL_MS = 1500
 
 export default function RecreateItemPage({
   params,
@@ -20,7 +31,84 @@ export default function RecreateItemPage({
 }) {
   const { shortcode } = use(params)
   const { tokens } = useThemePref()
-  const { data: item, error } = usePolling(() => getRecreateItem(shortcode), 10000)
+  const { data: item, error, refresh } = usePolling(() => getRecreateItem(shortcode), 15000)
+
+  const [source, setSource] = useState<MediaSummary | null>(null)
+  const [slides, setSlides] = useState<number[] | null>(null)
+  const [phase, setPhase] = useState<Phase>('idle')
+  const [failure, setFailure] = useState<string | null>(null)
+  const [payload, setPayload] = useState<RecreatePayload | null>(null)
+
+  // The post itself is what says how many slides there are and whether the
+  // files are already on disk. The recreate row is a snapshot and cannot.
+  useEffect(() => {
+    if (!item) return
+    let cancelled = false
+    void getMedia(item.username, 500, 0)
+      .then((page) => {
+        if (cancelled) return
+        const found = page.items.find((i) => i.shortcode === shortcode) ?? null
+        setSource(found)
+        if (found && slides === null) {
+          setSlides(
+            found.child_count > 1
+              ? Array.from({ length: found.child_count }, (_, n) => n + 1)
+              : [0],
+          )
+        }
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [item, shortcode, slides])
+
+  useEffect(() => {
+    if (item?.payload) setPayload(item.payload)
+  }, [item])
+
+  const isCarousel = (source?.child_count ?? 1) > 1
+  const cached = source?.full_status === 'ready'
+
+  async function submit() {
+    setFailure(null)
+    try {
+      if (!cached) {
+        setPhase('fetching')
+        const first = await ensureMedia([shortcode])
+        const why = first.errors?.[shortcode]
+        if (why || first.statuses[shortcode] === 'quota') {
+          // A payload naming files that were never fetched would be worse
+          // than refusing outright.
+          setFailure(why ?? 'the reel cap is spent, so this cannot be fetched right now')
+          setPhase('error')
+          return
+        }
+        await new Promise<void>((resolve, reject) => {
+          const tick = async () => {
+            try {
+              const state = await ensureMedia([shortcode])
+              if (state.errors?.[shortcode]) return reject(new Error(state.errors[shortcode]))
+              if (state.statuses[shortcode] === 'ready') return resolve()
+              setTimeout(() => void tick(), POLL_MS)
+            } catch (e) {
+              reject(e)
+            }
+          }
+          void tick()
+        })
+      }
+
+      setPhase('preparing')
+      const built = await prepareRecreate(shortcode, isCarousel ? slides : null)
+      setPayload(built)
+      setPhase('done')
+      await refresh()
+    } catch (e) {
+      setFailure(e instanceof Error ? e.message : String(e))
+      setPhase('error')
+    }
+  }
 
   if (error) {
     return (
@@ -31,6 +119,9 @@ export default function RecreateItemPage({
       </AppShell>
     )
   }
+
+  const busy = phase === 'fetching' || phase === 'preparing'
+  const chosen = isCarousel ? (slides ?? []) : [0]
 
   return (
     <AppShell>
@@ -46,15 +137,10 @@ export default function RecreateItemPage({
           <img
             src={item?.thumb_url}
             alt=""
-            style={{
-              width: 260,
-              borderRadius: 10,
-              display: 'block',
-              background: tokens.surface,
-            }}
+            style={{ width: 240, borderRadius: 10, display: 'block', background: tokens.surface }}
           />
 
-          <Flex vertical gap={10} style={{ flex: 1, minWidth: 260 }}>
+          <Flex vertical gap={12} style={{ flex: 1, minWidth: 300 }}>
             <Flex align="center" gap={10}>
               <Title level={5} style={{ margin: 0 }}>{item?.username}</Title>
               {item && <Tag data-testid="item-status">{item.status}</Tag>}
@@ -67,17 +153,146 @@ export default function RecreateItemPage({
               {item?.caption || 'No caption'}
             </Text>
 
-            {/* An honest empty state rather than a workflow that does nothing.
-                A disabled Generate button would imply the machinery exists
-                and is merely switched off. */}
-            <Alert
-              type="info"
-              showIcon
-              data-testid="no-generator"
-              title="No generator connected yet"
-              description="This is where the source post gets turned into your own version. The service that does that is not built, so nothing is submitted from here."
-              style={{ marginTop: 6 }}
-            />
+            {isCarousel && (
+              <Flex vertical gap={6} data-testid="slide-picker">
+                <Text style={{ fontSize: 11, letterSpacing: '.1em', color: tokens.textSecondary }}>
+                  SLIDES
+                </Text>
+                {/* Before the post is downloaded there are no per-slide
+                    images -- the cached thumbnail is the cover. Numbers are
+                    what we can honestly offer until then. */}
+                <Flex gap={7} wrap>
+                  {Array.from({ length: source?.child_count ?? 0 }, (_, n) => n + 1).map((n) => {
+                    const on = chosen.includes(n)
+                    return (
+                      <div
+                        key={n}
+                        role="checkbox"
+                        aria-checked={on}
+                        data-testid={`slide-${n}`}
+                        onClick={() =>
+                          setSlides((prev) => {
+                            const cur = prev ?? []
+                            return cur.includes(n)
+                              ? cur.filter((x) => x !== n)
+                              : [...cur, n].sort((a, b) => a - b)
+                          })
+                        }
+                        style={{
+                          cursor: 'pointer',
+                          minWidth: 56,
+                          height: 56,
+                          borderRadius: 8,
+                          display: 'grid',
+                          placeItems: 'center',
+                          fontSize: 13,
+                          fontWeight: 600,
+                          color: on ? '#fff' : tokens.textSecondary,
+                          background: on ? tokens.action : tokens.surface,
+                          border: `1px solid ${on ? tokens.action : tokens.hairline}`,
+                          position: 'relative',
+                          overflow: 'hidden',
+                        }}
+                      >
+                        {cached ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={`/api/media/${shortcode}/full?child=${n}`}
+                            alt=""
+                            style={{
+                              position: 'absolute',
+                              inset: 0,
+                              width: '100%',
+                              height: '100%',
+                              objectFit: 'cover',
+                              opacity: on ? 1 : 0.45,
+                            }}
+                          />
+                        ) : null}
+                        <span style={{ position: 'relative', textShadow: '0 1px 3px rgba(0,0,0,.8)' }}>
+                          {on ? <CheckOutlined /> : n}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </Flex>
+                <Text style={{ fontSize: 11, color: tokens.textSecondary }}>
+                  {chosen.length} of {source?.child_count ?? 0} selected
+                </Text>
+              </Flex>
+            )}
+
+            <Flex gap={10} align="center">
+              <Button
+                type="primary"
+                data-testid="prepare"
+                loading={busy}
+                disabled={busy || (isCarousel && chosen.length === 0)}
+                onClick={() => void submit()}
+              >
+                {payload ? 'Prepare again' : 'Submit'}
+              </Button>
+              {busy && (
+                <Text style={{ fontSize: 12, color: tokens.textSecondary }}>
+                  {phase === 'fetching' ? 'Downloading the post first' : 'Building the payload'}
+                </Text>
+              )}
+              {!cached && !busy && (
+                <Text style={{ fontSize: 12, color: tokens.textSecondary }}>
+                  Not downloaded yet — submitting will fetch it.
+                </Text>
+              )}
+            </Flex>
+
+            {failure && (
+              <Alert type="error" showIcon data-testid="prepare-error" title="Could not prepare" description={failure} />
+            )}
+
+            {payload ? (
+              <Flex vertical gap={6}>
+                <Text style={{ fontSize: 11, letterSpacing: '.1em', color: tokens.textSecondary }}>
+                  PAYLOAD
+                </Text>
+                {/* Read only: this is what a creator would be handed, not a
+                    form. Editing it here would describe files that are not
+                    what is on disk. */}
+                <pre
+                  data-testid="payload-preview"
+                  style={{
+                    margin: 0,
+                    padding: 12,
+                    borderRadius: 8,
+                    background: tokens.surface,
+                    border: `1px solid ${tokens.hairline}`,
+                    fontSize: 11.5,
+                    lineHeight: 1.5,
+                    maxHeight: 340,
+                    overflow: 'auto',
+                  }}
+                >
+                  {JSON.stringify(payload, null, 2)}
+                </pre>
+                <Alert
+                  type="info"
+                  showIcon
+                  data-testid="not-submitted"
+                  title="Prepared, not submitted"
+                  description="The files are on disk and this is the payload a creator would receive. Nothing has been put on a queue yet."
+                />
+              </Flex>
+            ) : (
+              phase !== 'error' && (
+                <Alert
+                  type="info"
+                  showIcon
+                  data-testid="no-generator"
+                  title="No generator connected yet"
+                  description="Submitting downloads the post and builds the payload a creator would receive. The service that consumes it is not built."
+                />
+              )
+            )}
+
+            {busy && <Spin size="small" />}
           </Flex>
         </Flex>
       </Content>

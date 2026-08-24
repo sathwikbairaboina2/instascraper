@@ -81,6 +81,9 @@ CREATE TABLE IF NOT EXISTS recreate_items (
   caption     TEXT,
   status      TEXT NOT NULL DEFAULT 'selected',
   error       TEXT,
+  slides      TEXT,
+  payload     TEXT,
+  prepared_at TEXT,
   added_at    TEXT NOT NULL,
   updated_at  TEXT NOT NULL
 );

@@ -178,3 +178,85 @@ test('a tile still selects on the other tabs', async ({ page }) => {
 
   await expect(page.getByTestId('selection-count')).toHaveText('1 selected')
 })
+
+test('a carousel offers its slides; a single post does not', async ({ page }) => {
+  // nike-6 is a three-slide carousel in the seed; nike-0 is a lone photo.
+  await page.goto('/p/nike')
+  await page.getByTestId('recreate-nike-6').click()
+  await page.getByTestId('recreate-nike-0').click()
+  await expect(page.getByTestId('recreate-flag-nike-0')).toBeVisible()
+
+  await page.goto('/recreate/nike-6')
+  await expect(page.getByTestId('slide-picker')).toBeVisible()
+  await expect(page.getByTestId('slide-3')).toBeVisible()
+
+  await page.goto('/recreate/nike-0')
+  await expect(page.getByTestId('slide-picker')).toHaveCount(0)
+})
+
+test('every slide starts chosen and can be dropped', async ({ page }) => {
+  await page.goto('/p/nike')
+  await page.getByTestId('recreate-nike-6').click()
+  await expect(page.getByTestId('recreate-flag-nike-6')).toBeVisible()
+
+  await page.goto('/recreate/nike-6')
+  await expect(page.getByTestId('slide-picker')).toContainText('3 of 3 selected')
+
+  await page.getByTestId('slide-2').click()
+
+  await expect(page.getByTestId('slide-picker')).toContainText('2 of 3 selected')
+  await expect(page.getByTestId('slide-2')).toHaveAttribute('aria-checked', 'false')
+})
+
+test('submitting downloads, builds the payload, and shows it read only', async ({
+  page,
+}) => {
+  await page.goto('/p/nike')
+  await page.getByTestId('recreate-nike-6').click()
+  await expect(page.getByTestId('recreate-flag-nike-6')).toBeVisible()
+
+  await page.goto('/recreate/nike-6')
+  await page.getByTestId('slide-2').click()
+  await page.getByTestId('prepare').click()
+
+  const preview = page.getByTestId('payload-preview')
+  await expect(preview).toBeVisible({ timeout: 30000 })
+  await expect(preview).toContainText('"shortcode": "nike-6"')
+  await expect(preview).toContainText('"index": 1')
+  await expect(preview).toContainText('"index": 3')
+  await expect(preview).not.toContainText('"index": 2')
+
+  // Prepared is not submitted: nothing has reached a queue.
+  await expect(page.getByTestId('not-submitted')).toBeVisible()
+  await expect(page.getByTestId('item-status')).toHaveText('prepared')
+})
+
+test('a prepared payload is still there after a reload', async ({ page }) => {
+  await page.goto('/p/nike')
+  await page.getByTestId('recreate-nike-7').click()
+  await expect(page.getByTestId('recreate-flag-nike-7')).toBeVisible()
+
+  await page.goto('/recreate/nike-7')
+  await page.getByTestId('prepare').click()
+  await expect(page.getByTestId('payload-preview')).toBeVisible({ timeout: 30000 })
+
+  await page.reload()
+
+  await expect(page.getByTestId('payload-preview')).toBeVisible()
+  await expect(page.getByTestId('payload-preview')).toContainText('"shortcode": "nike-7"')
+})
+
+test('a prepared item moves to its own tab', async ({ page }) => {
+  await page.goto('/p/nike')
+  await page.getByTestId('recreate-nike-5').click()
+  await expect(page.getByTestId('recreate-flag-nike-5')).toBeVisible()
+
+  await page.goto('/recreate/nike-5')
+  await page.getByTestId('prepare').click()
+  await expect(page.getByTestId('payload-preview')).toBeVisible({ timeout: 30000 })
+
+  await page.goto('/recreate')
+  await expect(page.getByTestId('recreate-tabs')).toContainText('Prepared 1')
+  await page.getByTestId('recreate-tabs').getByText('Prepared 1', { exact: true }).click()
+  await expect(page.getByTestId('recreate-row-nike-5')).toBeVisible()
+})
