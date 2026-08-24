@@ -10,6 +10,7 @@ from app.ig.fake import FakeAdapter
 from app.worker import queue
 from app.worker.breaker import Breaker
 from app.worker.pacer import Pacer
+from app.runtime import RuntimeConfig
 from app.worker.runner import Worker
 
 
@@ -60,7 +61,9 @@ def test_breaker_waits_at_least_as_long_as_meta_asked(settings, conn):
         raise t.IgRateLimited("429", retry_after=1818)
 
     queue.enqueue(conn, "profile_sync", {"username": "nike"})
-    worker = Worker(s, FakeAdapter(), breaker, Pacer(0.0), {"profile_sync": handler})
+    worker = Worker(
+        RuntimeConfig.fixed(s, FakeAdapter()), breaker, Pacer(0.0), {"profile_sync": handler}
+    )
     worker.start()
     worker.wake.set()
     with pytest.raises(TimeoutError):
@@ -78,7 +81,9 @@ def test_backoff_floor_still_applies_when_no_wait_is_given(settings, conn):
         raise t.IgRateLimited("429")
 
     queue.enqueue(conn, "profile_sync", {"username": "nike"})
-    worker = Worker(s, FakeAdapter(), breaker, Pacer(0.0), {"profile_sync": handler})
+    worker = Worker(
+        RuntimeConfig.fixed(s, FakeAdapter()), breaker, Pacer(0.0), {"profile_sync": handler}
+    )
     worker.start()
     worker.wake.set()
     with pytest.raises(TimeoutError):
@@ -103,7 +108,12 @@ def test_a_dead_token_trips_the_breaker_permanently(settings, conn):
 
     queue.enqueue(conn, "profile_sync", {"username": "nike"})
     queue.enqueue(conn, "profile_sync", {"username": "adidas"})
-    worker = Worker(settings, FakeAdapter(), breaker, Pacer(0.0), {"profile_sync": handler})
+    worker = Worker(
+        RuntimeConfig.fixed(settings, FakeAdapter()),
+        breaker,
+        Pacer(0.0),
+        {"profile_sync": handler},
+    )
     worker.start()
     worker.wake.set()
     with pytest.raises(TimeoutError):

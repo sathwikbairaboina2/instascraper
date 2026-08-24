@@ -5,6 +5,7 @@ from app.ig.fake import FakeAdapter
 from app.worker import queue
 from app.worker.breaker import Breaker
 from app.worker.pacer import Pacer
+from app.runtime import RuntimeConfig
 from app.worker.runner import HandlerContext, Worker
 
 
@@ -19,7 +20,7 @@ def worker_env(settings, conn):
 
 
 def _run(settings, adapter, breaker, pacer, handlers, conn):
-    worker = Worker(settings, adapter, breaker, pacer, handlers)
+    worker = Worker(RuntimeConfig.fixed(settings, adapter), breaker, pacer, handlers)
     worker.start()
     worker.wake.set()
     worker.drain(timeout=10)
@@ -103,7 +104,9 @@ def test_challenge_trips_breaker_permanently_and_stops_work(worker_env):
     queue.enqueue(conn, "profile_sync", {"username": "nike"})
     queue.enqueue(conn, "profile_sync", {"username": "adidas"})
 
-    worker = Worker(settings, adapter, breaker, pacer, {"profile_sync": handler})
+    worker = Worker(
+        RuntimeConfig.fixed(settings, adapter), breaker, pacer, {"profile_sync": handler}
+    )
     worker.start()
     worker.wake.set()
     with pytest.raises(TimeoutError):
@@ -159,3 +162,31 @@ def test_handler_can_enqueue_follow_up_work(worker_env):
     _run(settings, adapter, breaker, pacer, {"profile_sync": sync, "page_fetch": page}, conn)
 
     assert seen == [{"username": "nike"}]
+
+
+def test_worker_picks_up_a_swapped_adapter_on_the_next_job(worker_env):
+    """A cached adapter reference would make the toggle silently do nothing."""
+    from app import runtime as rt
+
+    settings, conn, adapter, breaker, pacer = worker_env
+    first, second = FakeAdapter(), FakeAdapter()
+    holder = rt.RuntimeConfig(settings, rt.Runtime("fake", settings, first))
+
+    seen = []
+
+    def handler(ctx, payload):
+        seen.append(ctx.adapter)
+
+    queue.enqueue(conn, "profile_sync", {"username": "nike"})
+    worker = Worker(holder, breaker, pacer, {"profile_sync": handler})
+    worker.start()
+    worker.wake.set()
+    worker.drain(timeout=2.0)
+
+    holder.swap(rt.Runtime("graph", settings, second))
+    queue.enqueue(conn, "profile_sync", {"username": "adidas"})
+    worker.wake.set()
+    worker.drain(timeout=2.0)
+    worker.shutdown()
+
+    assert seen == [first, second], "worker kept using the adapter it started with"

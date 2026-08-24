@@ -45,11 +45,10 @@ def create_app(
 
         if start_worker:
             worker = Worker(
-                settings=current.settings,
-                adapter=current.adapter,
-                breaker=app.state.breaker,
-                pacer=app.state.pacer,
-                handlers=HANDLERS,
+                app.state.runtime,
+                app.state.breaker,
+                app.state.pacer,
+                HANDLERS,
             )
             worker.start()
             app.state.worker = worker

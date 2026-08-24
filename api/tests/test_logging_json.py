@@ -35,8 +35,10 @@ def test_worker_job_lines_are_valid_json(settings, conn, caplog):
     queue.enqueue(conn, "profile_sync", {"username": "nike"})
 
     with caplog.at_level(logging.INFO, logger="worker"):
+        from app.runtime import RuntimeConfig
+
         worker = Worker(
-            settings, FakeAdapter(), Breaker(), Pacer(0.0),
+            RuntimeConfig.fixed(settings, FakeAdapter()), Breaker(), Pacer(0.0),
             {"profile_sync": lambda ctx, payload: None},
         )
         worker.start()

@@ -34,15 +34,13 @@ class Worker(threading.Thread):
 
     def __init__(
         self,
-        settings: Settings,
-        adapter,
+        runtime,
         breaker: Breaker,
         pacer: Pacer,
         handlers: dict[str, Handler],
     ):
         super().__init__(name="ig-worker", daemon=True)
-        self.settings = settings
-        self.adapter = adapter
+        self.runtime = runtime
         self.breaker = breaker
         self.pacer = pacer
         self.handlers = handlers
@@ -57,7 +55,7 @@ class Worker(threading.Thread):
 
     def drain(self, timeout: float = 5.0) -> None:
         """Test helper: block until nothing is queued or running."""
-        conn = db.get_conn(self.settings)
+        conn = db.get_conn(self.runtime.current.settings)
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
             if queue.depth(conn) == 0:
@@ -67,8 +65,10 @@ class Worker(threading.Thread):
 
     # ---- main loop -----------------------------------------------------
     def run(self) -> None:
-        conn = db.get_conn(self.settings)
         while not self.stop_flag.is_set():
+            current = self.runtime.current
+            conn = db.get_conn(current.settings)
+
             wait = self.breaker.wait_seconds()
             if wait > 0:
                 self.stop_flag.wait(min(wait, IDLE_TIMEOUT))
@@ -80,9 +80,9 @@ class Worker(threading.Thread):
                 self.wake.clear()
                 continue
 
-            self._run_job(conn, job)
+            self._run_job(conn, current, job)
 
-    def _run_job(self, conn, job) -> None:
+    def _run_job(self, conn, current, job) -> None:
         payload = json.loads(job["payload"])
         handler = self.handlers.get(job["kind"])
         started = time.monotonic()
@@ -93,8 +93,8 @@ class Worker(threading.Thread):
 
         ctx = HandlerContext(
             conn=conn,
-            adapter=self.adapter,
-            settings=self.settings,
+            adapter=current.adapter,
+            settings=current.settings,
             pacer=self.pacer,
             enqueue=lambda kind, p: self._enqueue(conn, kind, p),
         )
@@ -104,7 +104,7 @@ class Worker(threading.Thread):
         except t.IgRateLimited as exc:
             queue.requeue(conn, job["id"])
             # IG_BACKOFF is a floor, never a licence to return sooner than asked.
-            wait = max(self.settings.ig_backoff, exc.retry_after or 0)
+            wait = max(current.settings.ig_backoff, exc.retry_after or 0)
             self.breaker.trip_temporary(wait, f"Rate limited: {exc}")
             self._log(job, payload, started, "rate_limited")
             return
