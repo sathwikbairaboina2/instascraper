@@ -6,8 +6,17 @@ exist only inside a listing response.
 """
 
 import json
+from urllib.parse import quote
 
-from app.ig import types as t
+import httpx
+
+from app.config import Settings
+from app.ig import graph_map, types as t
+
+_BASE = "https://graph.facebook.com"
+_PROFILE_FIELDS = (
+    "id,ig_id,username,name,biography,followers_count,media_count,profile_picture_url"
+)
 
 _CHALLENGE_CODES = {102, 190}
 _RATE_LIMIT_CODES = {4, 17, 32, 613}
@@ -82,3 +91,67 @@ def classify(
     if code in _TRANSIENT_CODES or status >= 500:
         return t.IgTransient(message)
     return t.IgTransient(message)
+
+
+def _httpx_transport(url: str, headers: dict) -> tuple[int, dict, dict]:
+    response = httpx.get(url, headers=headers, timeout=30.0)
+    try:
+        body = response.json()
+    except ValueError:
+        body = {}
+    return response.status_code, {k.lower(): v for k, v in response.headers.items()}, body
+
+
+def _httpx_fetcher(url: str) -> tuple[int, bytes]:
+    response = httpx.get(url, timeout=60.0, follow_redirects=True)
+    return response.status_code, response.content
+
+
+class GraphAdapter:
+    """Reads public Business and Creator accounts via Business Discovery."""
+
+    def __init__(self, settings: Settings, transport=None, fetcher=None):
+        self._settings = settings
+        self._transport = transport or _httpx_transport
+        self._fetcher = fetcher or _httpx_fetcher
+        self._usage = 0.0
+
+    # ---- transport -----------------------------------------------------
+    def _get(self, fields: str) -> dict:
+        if not self._settings.graph_token or not self._settings.graph_user_id:
+            raise t.IgChallenge(
+                "IG_GRAPH_TOKEN and IG_GRAPH_USER_ID must be set to use the Graph adapter."
+            )
+        # Refuse to spend a call we already know is close to the ceiling.
+        if self._usage >= self._settings.graph_usage_limit:
+            raise t.IgRateLimited(
+                f"app usage at {self._usage:.0f}% of Meta's limit; backing off"
+            )
+
+        url = (
+            f"{_BASE}/{self._settings.graph_version}/{self._settings.graph_user_id}"
+            f"?fields={quote(fields, safe='(),{}.')}"
+        )
+        # The token goes in a header, never the query string: a url ends up in
+        # exception text, the json logs and the activity table.
+        headers = {"Authorization": f"Bearer {self._settings.graph_token}"}
+        try:
+            status, response_headers, body = self._transport(url, headers)
+        except t.IgError:
+            raise
+        except Exception as exc:
+            raise t.IgTransient(redact(str(exc), self._settings.graph_token)) from exc
+
+        self._usage = max(self._usage, usage_percent(response_headers))
+        if status >= 400 or "error" in body:
+            raise classify(status, body, response_headers, self._settings.graph_token)
+        return body
+
+    # ---- IgAdapter -----------------------------------------------------
+    def login(self) -> None:
+        """No interactive login exists; this validates the token instead."""
+        self._get("id")
+
+    def fetch_profile(self, username: str) -> t.IgProfile:
+        payload = self._get(f"business_discovery.username({username}){{{_PROFILE_FIELDS}}}")
+        return graph_map.profile_from_payload(payload)

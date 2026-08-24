@@ -18,6 +18,11 @@ class Settings:
     adapter: str
     anonymous: bool
     max_sleep: float
+    graph_token: str
+    graph_user_id: str
+    graph_version: str
+    graph_refresh_pages: int
+    graph_usage_limit: float
 
 
 def _truthy(value: str) -> bool:
@@ -48,4 +53,12 @@ def load_settings() -> Settings:
         adapter=os.environ.get("IG_ADAPTER", "real"),
         anonymous=anonymous,
         max_sleep=float(os.environ.get("IG_MAX_SLEEP", "60")),
+        graph_token=os.environ.get("IG_GRAPH_TOKEN", ""),
+        graph_user_id=os.environ.get("IG_GRAPH_USER_ID", ""),
+        # Deliberately no source-level default: pinning a Graph version in
+        # code means a Meta deprecation becomes a code change.
+        graph_version=os.environ.get("IG_GRAPH_VERSION", ""),
+        # How many pages deep to look when refreshing an expired media url.
+        graph_refresh_pages=int(os.environ.get("IG_GRAPH_REFRESH_PAGES", "2")),
+        graph_usage_limit=float(os.environ.get("IG_GRAPH_USAGE_LIMIT", "90")),
     )

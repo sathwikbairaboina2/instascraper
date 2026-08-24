@@ -25,6 +25,11 @@ def settings(tmp_path: Path) -> Settings:
         adapter="fake",
         anonymous=True,
         max_sleep=60,
+        graph_token="",
+        graph_user_id="",
+        graph_version="v99.0",
+        graph_refresh_pages=2,
+        graph_usage_limit=90.0,
     )
 
 
