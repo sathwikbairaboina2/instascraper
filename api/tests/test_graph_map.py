@@ -50,3 +50,57 @@ def test_shortcode_parses_from_permalink(permalink, expected):
 def test_shortcode_rejects_an_unrecognised_permalink():
     with pytest.raises(ValueError):
         graph_map.shortcode_from_permalink("https://example.com/nope")
+
+
+def test_image_post_maps_to_a_single_source():
+    page = graph_map.page_from_payload(load("media_page.json"))
+    post = page.posts[0]
+    assert post.shortcode == "AAAAAAAAAAA"
+    assert post.kind == "image"
+    assert post.is_video is False
+    assert post.child_count == 1
+    assert post.thumb_url.endswith("img1.jpg")
+    assert post.sources == (
+        t.MediaSource(0, "https://scontent.cdninstagram.com/img1.jpg", "image/jpeg", False),
+    )
+
+
+def test_timestamp_is_normalised_to_iso_with_a_colon_offset():
+    post = graph_map.page_from_payload(load("media_page.json")).posts[0]
+    assert post.taken_at_iso == "2026-08-20T14:03:11+00:00"
+
+
+def test_reel_is_distinguished_from_plain_video_by_its_permalink():
+    post = graph_map.page_from_payload(load("media_page.json")).posts[1]
+    assert post.kind == "reel"
+    assert post.is_video is True
+    # A video's thumbnail is the still, but its source is the MP4.
+    assert post.thumb_url.endswith("thumb2.jpg")
+    assert post.sources[0].url.endswith("vid2.mp4")
+    assert post.sources[0].mime == "video/mp4"
+
+
+def test_carousel_children_become_one_indexed_sources():
+    post = graph_map.page_from_payload(load("media_page.json")).posts[2]
+    assert post.kind == "carousel"
+    assert post.child_count == 2
+    assert [s.child_idx for s in post.sources] == [1, 2]
+    assert post.sources[0].mime == "image/jpeg"
+    assert post.sources[1].mime == "video/mp4"
+    assert post.sources[1].is_video is True
+
+
+def test_page_reports_the_after_cursor_when_more_remain():
+    assert graph_map.page_from_payload(load("media_page.json")).next_cursor == "CURSOR_AFTER_1"
+
+
+def test_final_page_reports_exhaustion_despite_carrying_a_cursor():
+    """Meta still sends an `after` cursor on the last page; only `next` is
+    proof that another page exists."""
+    assert graph_map.page_from_payload(load("media_last_page.json")).next_cursor is None
+
+
+def test_absent_media_edge_is_an_empty_exhausted_page():
+    page = graph_map.page_from_payload({"business_discovery": {"username": "x"}})
+    assert page.posts == []
+    assert page.next_cursor is None

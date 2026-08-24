@@ -6,10 +6,12 @@ tested against recorded fixtures.
 """
 
 import re
+from datetime import datetime
 
 from app.ig import types as t
 
 _PERMALINK = re.compile(r"/(?:p|reel|tv)/([A-Za-z0-9_-]+)")
+_KIND = {"IMAGE": "image", "VIDEO": "video", "CAROUSEL_ALBUM": "carousel"}
 
 
 def shortcode_from_permalink(permalink: str) -> str:
@@ -32,3 +34,82 @@ def profile_from_payload(payload: dict) -> t.IgProfile:
         post_count=int(bd.get("media_count") or 0),
         avatar_url=bd.get("profile_picture_url") or "",
     )
+
+
+def _mime(media_type: str) -> str:
+    # Meta does not return a content type in a listing, so it is derived.
+    return "video/mp4" if media_type == "VIDEO" else "image/jpeg"
+
+
+def _children(node: dict) -> list[dict]:
+    return (node.get("children") or {}).get("data") or []
+
+
+def _timestamp(raw: str) -> str:
+    """Meta sends `+0000`; the rest of the app stores `+00:00`."""
+    return datetime.fromisoformat(raw).isoformat()
+
+
+def _sources(node: dict) -> tuple[t.MediaSource, ...]:
+    children = _children(node)
+    if children:
+        return tuple(
+            t.MediaSource(
+                child_idx=index,
+                url=child.get("media_url") or "",
+                mime=_mime(child.get("media_type", "")),
+                is_video=child.get("media_type") == "VIDEO",
+            )
+            for index, child in enumerate(children, start=1)
+        )
+    media_type = node.get("media_type", "")
+    return (
+        t.MediaSource(
+            child_idx=0,
+            url=node.get("media_url") or "",
+            mime=_mime(media_type),
+            is_video=media_type == "VIDEO",
+        ),
+    )
+
+
+def _thumb_url(node: dict) -> str:
+    if node.get("media_type") == "VIDEO":
+        return node.get("thumbnail_url") or node.get("media_url") or ""
+    children = _children(node)
+    if children and not node.get("media_url"):
+        first = children[0]
+        if first.get("media_type") == "VIDEO":
+            return first.get("thumbnail_url") or ""
+        return first.get("media_url") or ""
+    return node.get("media_url") or ""
+
+
+def post_from_node(node: dict) -> t.IgPost:
+    permalink = node.get("permalink") or ""
+    media_type = node.get("media_type", "")
+    kind = _KIND.get(media_type, "image")
+    if kind == "video" and "/reel/" in permalink:
+        kind = "reel"
+    children = _children(node)
+    return t.IgPost(
+        shortcode=shortcode_from_permalink(permalink),
+        kind=kind,
+        taken_at_iso=_timestamp(node["timestamp"]),
+        caption=node.get("caption") or "",
+        is_video=media_type == "VIDEO",
+        child_count=len(children) or 1,
+        thumb_url=_thumb_url(node),
+        ig_url=permalink,
+        sources=_sources(node),
+    )
+
+
+def page_from_payload(payload: dict) -> t.IgPage:
+    media = (payload.get("business_discovery") or {}).get("media") or {}
+    posts = [post_from_node(node) for node in media.get("data") or []]
+    paging = media.get("paging") or {}
+    # An `after` cursor is present even on the final page. Only the presence
+    # of `next` proves another page exists.
+    cursor = (paging.get("cursors") or {}).get("after") if paging.get("next") else None
+    return t.IgPage(posts=posts, next_cursor=cursor)
