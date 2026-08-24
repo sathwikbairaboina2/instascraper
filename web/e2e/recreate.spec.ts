@@ -55,7 +55,7 @@ test('the list shows what was marked, and can drop it', async ({ page }) => {
 
   await page.goto('/recreate')
   await expect(page.getByTestId('recreate-row-nike-2')).toBeVisible()
-  await expect(page.getByTestId('recreate-status-nike-2')).toHaveText('Selected')
+  await expect(page.getByTestId('recreate-tabs')).toContainText('Selected 1')
 
   await page.getByTestId('recreate-remove-nike-2').click()
 
@@ -122,4 +122,18 @@ test('a marked item survives its cached thumbnail going away', async ({ page }) 
 
   await expect(page.getByTestId('recreate-row-nike-5')).toBeVisible()
   await expect(page.getByTestId('recreate-thumb-fallback-nike-5')).toBeVisible()
+})
+
+test('a tab with nothing in it says so without claiming the list is empty', async ({
+  page,
+}) => {
+  await page.goto('/p/nike')
+  await page.getByTestId('recreate-nike-1').click()
+  await expect(page.getByTestId('recreate-flag-nike-1')).toBeVisible()
+
+  await page.goto('/recreate')
+  await page.getByTestId('recreate-tabs').getByText('Done 0', { exact: true }).click()
+
+  await expect(page.getByTestId('recreate-empty')).toContainText('Nothing done right now')
+  await expect(page.getByTestId('recreate-list')).toHaveCount(0)
 })
