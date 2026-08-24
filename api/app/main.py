@@ -35,7 +35,7 @@ def create_app(
         conn = db.get_conn(settings)
         db.init_schema(conn)
         db.migrate(conn)
-        for directory in (settings.media_dir, settings.session_dir, settings.out_dir):
+        for directory in (settings.media_dir, settings.out_dir):
             directory.mkdir(parents=True, exist_ok=True)
         result = sweep.sweep(conn, settings.media_dir)
         # json.dumps, not %s: a dict interpolated into a string emits Python

@@ -12,19 +12,14 @@ from app import db
 @pytest.fixture
 def settings(tmp_path: Path) -> Settings:
     return Settings(
-        ig_username="tester",
-        ig_password="secret",
         db_path=tmp_path / "app.db",
         media_dir=tmp_path / "media",
-        session_dir=tmp_path / "session",
         out_dir=tmp_path / "out",
         page_size=4,
         first_page_size=2,
         ig_min_interval=0.05,
         ig_backoff=2,
         adapter="fake",
-        anonymous=True,
-        max_sleep=60,
         graph_token="",
         graph_user_id="",
         graph_version="v99.0",
@@ -35,7 +30,7 @@ def settings(tmp_path: Path) -> Settings:
 
 @pytest.fixture
 def conn(settings):
-    for d in (settings.media_dir, settings.session_dir, settings.out_dir):
+    for d in (settings.media_dir, settings.out_dir):
         d.mkdir(parents=True, exist_ok=True)
     c = db.get_conn(settings)
     db.init_schema(c)

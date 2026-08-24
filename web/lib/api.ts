@@ -1,6 +1,6 @@
 export type StatusBody = {
   worker: 'running' | 'stopped'
-  anonymous: boolean
+  token_configured: boolean
   breaker: {
     tripped: boolean
     permanent: boolean

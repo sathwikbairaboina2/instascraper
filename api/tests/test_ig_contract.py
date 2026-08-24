@@ -67,18 +67,30 @@ def test_fake_raise_on_is_one_shot():
     assert fake.fetch_profile("nike").username == "nike"
 
 
-def test_only_adapter_module_imports_instaloader():
-    """Global constraint: the volatile dependency stays in one directory."""
+def test_no_module_imports_instaloader():
+    """Global constraint: the dependency is gone, not merely unused."""
     from pathlib import Path
 
     root = Path(__file__).resolve().parents[1] / "app"
-    allowed = {"adapter.py", "rate.py"}
     offenders = [
         p.relative_to(root).as_posix()
         for p in root.rglob("*.py")
-        if "instaloader" in p.read_text() and p.name not in allowed
+        if "instaloader" in p.read_text().lower()
     ]
     assert offenders == []
+
+
+def test_credential_settings_are_gone():
+    from app.config import Settings
+
+    fields = set(Settings.__dataclass_fields__)
+    assert not fields & {
+        "ig_username",
+        "ig_password",
+        "session_dir",
+        "anonymous",
+        "max_sleep",
+    }
 
 
 def test_seeded_adapter_is_shared_by_make_adapter(settings):

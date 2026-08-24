@@ -186,15 +186,15 @@ export default function AppShell({
             showIcon
             banner
             title={
-              status?.anonymous
-                ? 'Instagram is refusing anonymous access'
+              status?.token_configured === false
+                ? 'Graph API token not configured'
                 : breaker.permanent
-                  ? breaker.reason ?? 'Instagram session invalid'
+                  ? breaker.reason ?? 'Instagram token invalid'
                   : `${breaker.reason ?? 'Rate limited'}, resuming in about ${Math.ceil((breaker.seconds_remaining ?? 0) / 60)} min`
             }
             description={
-              status?.anonymous
-                ? 'Browsing public profiles still needs a dedicated account. Set IG_USERNAME and IG_PASSWORD, then run the login command.'
+              status?.token_configured === false
+                ? 'Reading public Business and Creator accounts needs a Meta Graph token. Set IG_GRAPH_TOKEN, IG_GRAPH_USER_ID and IG_GRAPH_VERSION in .env, then restart.'
                 : undefined
             }
             action={

@@ -5,7 +5,6 @@ services:
     environment:
       DB_PATH: /data/app.db
       MEDIA_DIR: /data/media
-      SESSION_DIR: /data/session
       OUT_DIR_CONTAINER: /out
     volumes:
       - ./data:/data
