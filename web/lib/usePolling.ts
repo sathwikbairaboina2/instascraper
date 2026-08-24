@@ -22,6 +22,9 @@ const HIDDEN_MAX = 30_000
 export function usePolling<T>(fn: () => Promise<T>, intervalMs: number, enabled = true) {
   const [data, setData] = useState<T | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // The message alone cannot tell "not ready yet" from "failed": both arrive
+  // as a 404. Callers that need to tell them apart read the thrown value.
+  const [cause, setCause] = useState<unknown>(null)
   const fnRef = useRef(fn)
   fnRef.current = fn
   const lastJson = useRef<string | null>(null)
@@ -35,8 +38,10 @@ export function usePolling<T>(fn: () => Promise<T>, intervalMs: number, enabled 
         setData(next)
       }
       setError(null)
+      setCause(null)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
+      setCause(e)
     }
   }, [])
 
@@ -91,5 +96,5 @@ export function usePolling<T>(fn: () => Promise<T>, intervalMs: number, enabled 
     }
   }, [enabled, intervalMs, refresh])
 
-  return { data, error, refresh }
+  return { data, error, cause, refresh }
 }

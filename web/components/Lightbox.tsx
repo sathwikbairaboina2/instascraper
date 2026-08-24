@@ -117,6 +117,26 @@ export default function Lightbox({
           </Flex>
         )}
 
+        {item.caption && (
+          // Scrolls rather than pushing the media off screen: Instagram
+          // captions run to paragraphs and the picture is what the modal is
+          // for.
+          <Text
+            data-testid="lightbox-caption"
+            style={{
+              fontSize: 13,
+              maxWidth: 760,
+              maxHeight: 96,
+              overflowY: 'auto',
+              whiteSpace: 'pre-wrap',
+              alignSelf: 'center',
+              textAlign: 'center',
+            }}
+          >
+            {item.caption}
+          </Text>
+        )}
+
         {isCarousel && ready && (
           <Flex gap={10}>
             <Button data-testid="lightbox-prev" icon={<LeftOutlined />} onClick={() => step(-1)}>Prev</Button>

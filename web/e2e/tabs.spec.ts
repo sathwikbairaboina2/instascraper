@@ -56,3 +56,43 @@ test('the header reports posts, followers and indexed', async ({ page }) => {
   await expect(page.getByTestId('profile-stat-followers')).toBeVisible()
   await expect(page.getByTestId('profile-stat-indexed')).toContainText('10')
 })
+
+test('a profile with no feed posts opens on reels rather than an empty grid', async ({
+  page,
+}) => {
+  // Real accounts exist that post almost only reels: bbcnews indexed twelve
+  // items, eleven of them reels. Opening on POSTS showed one tile.
+  await page.route('**/api/profiles/nike/media**', async (route) => {
+    const res = await route.fetch()
+    const body = await res.json()
+    body.items = body.items.map((i: Record<string, unknown>) => ({ ...i, kind: 'reel' }))
+    await route.fulfill({ response: res, json: body })
+  })
+
+  await page.goto('/p/nike')
+
+  await expect(page.getByTestId('profile-tabs').getByText('REELS', { exact: true })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  )
+  await expect(tiles(page)).toHaveCount(10)
+})
+
+test('choosing a tab is never overridden', async ({ page }) => {
+  await page.route('**/api/profiles/nike/media**', async (route) => {
+    const res = await route.fetch()
+    const body = await res.json()
+    body.items = body.items.map((i: Record<string, unknown>) => ({ ...i, kind: 'reel' }))
+    await route.fulfill({ response: res, json: body })
+  })
+
+  await page.goto('/p/nike')
+  await pickTab(page, 'POSTS')
+
+  // Empty, and that is the answer to what was asked for.
+  await expect(tiles(page)).toHaveCount(0)
+  await expect(page.getByTestId('profile-tabs').getByText('POSTS', { exact: true })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  )
+})

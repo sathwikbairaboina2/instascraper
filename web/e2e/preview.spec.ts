@@ -140,3 +140,11 @@ test('a video slide inside a carousel previews as video, not a broken image', as
 
   await expect(page.getByTestId('lightbox-image')).toHaveAttribute('src', /child=3/)
 })
+
+test('the preview shows the caption', async ({ page }) => {
+  await withStatus(page, 'nike-3', 'ready')
+  await page.goto('/p/nike')
+  await page.getByTestId('preview-nike-3').click()
+
+  await expect(page.getByTestId('lightbox-caption')).toHaveText('caption 3')
+})

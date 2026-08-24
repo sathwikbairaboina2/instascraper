@@ -26,13 +26,14 @@ import {
   Progress,
   Segmented,
   Skeleton,
+  Spin,
   Space,
   Tag,
   Tooltip,
   Typography,
   theme,
 } from 'antd'
-import { use, useCallback, useEffect, useMemo, useState } from 'react'
+import { use, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import AppShell from '@/components/AppShell'
 import ProfileHeader from '@/components/ProfileHeader'
@@ -40,6 +41,7 @@ import Lightbox from '@/components/Lightbox'
 import MediaTile from '@/components/MediaTile'
 import SelectionBar from '@/components/SelectionBar'
 import {
+  ApiError,
   clearCache,
   createDownload,
   ensureMedia,
@@ -47,6 +49,7 @@ import {
   getProfile,
   loadMore,
   setTracked,
+  syncProfile,
   type MediaSummary,
 } from '@/lib/api'
 import {
@@ -83,16 +86,37 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
   const [saved, setSaved] = useState<SavedSelection[]>([])
   const [saveName, setSaveName] = useState('')
 
-  const { data: profile, error, refresh: refreshProfile } = usePolling(
+  const { data: profile, error, cause, refresh: refreshProfile } = usePolling(
     () => getProfile(username),
     10000,
   )
+
+  // A 404 with no recorded error is not a failure: the profile has simply
+  // never been fetched, or is being fetched right now. The api draws that
+  // distinction and the screen has to honour it, or every new lookup opens
+  // on a red alert that disappears by itself a few seconds later.
+  const detail =
+    cause instanceof ApiError && cause.status === 404
+      ? ((cause.body as { detail?: { last_error?: string | null } } | null)?.detail ?? null)
+      : null
+  const syncing = detail !== null && !detail.last_error
+
+  // Reached by url rather than through the search box, nothing has queued the
+  // work, so the screen would wait on a fetch that was never asked for.
+  // enqueue_unique makes asking twice harmless.
+  const asked = useRef<string | null>(null)
+  useEffect(() => {
+    if (!syncing || asked.current === username) return
+    asked.current = username
+    void syncProfile(username).catch(() => {})
+  }, [syncing, username])
   const { data: media, refresh: refreshMedia } = usePolling(
     () => getMedia(username, windowSize, 0),
     4000,
   )
 
   useEffect(() => setSaved(loadSelections(username)), [username])
+
 
   const total = media?.total ?? 0
   useEffect(() => {
@@ -117,6 +141,22 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
 
   const set = <K extends keyof Filters>(key: K, value: Filters[K]) =>
     setFilters((prev) => ({ ...prev, [key]: value }))
+
+  // Some accounts post almost nothing but reels, and POSTS is a poor first
+  // impression when it holds one tile out of twelve. Open on whichever tab
+  // has something in it -- but only before a tab has been picked, because an
+  // empty grid you asked for is an answer, not a mistake to correct.
+  const tabPicked = useRef(false)
+  useEffect(() => {
+    tabPicked.current = false
+  }, [username])
+  useEffect(() => {
+    if (tabPicked.current || items.length === 0 || filters.kind !== 'posts') return
+    tabPicked.current = true
+    const hasPosts = items.some((item) => matchesKind(item, 'posts'))
+    const hasReels = items.some((item) => matchesKind(item, 'reels'))
+    if (!hasPosts && hasReels) setFilters((prev) => ({ ...prev, kind: 'reels' }))
+  }, [items, filters.kind])
   const filtersActive =
     filters.kind !== 'posts' || filters.cachedOnly || filters.query.trim() !== ''
 
@@ -153,6 +193,22 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
   const pending = selectedItems.length - readyCount
 
   const tile = density === 'Compact' ? 158 : 232
+
+  if (syncing) {
+    return (
+      <AppShell active={username}>
+        <Content style={{ padding: 32 }}>
+          <Flex vertical align="center" gap={14} style={{ marginTop: 120 }} data-testid="profile-loading">
+            <Spin size="large" />
+            <Text strong>Fetching {username}</Text>
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              Reading the profile and its first posts. One request at a time.
+            </Text>
+          </Flex>
+        </Content>
+      </AppShell>
+    )
+  }
 
   if (error) {
     return (
@@ -245,7 +301,10 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
               key={kind}
               role="tab"
               aria-selected={on}
-              onClick={() => set('kind', kind)}
+              onClick={() => {
+                tabPicked.current = true
+                set('kind', kind)
+              }}
               style={{
                 cursor: 'pointer',
                 padding: '11px 0 9px',
