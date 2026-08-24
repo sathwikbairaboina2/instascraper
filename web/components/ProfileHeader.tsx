@@ -3,17 +3,12 @@
 import { Avatar, Flex, Typography } from 'antd'
 
 import type { ProfileDetail } from '@/lib/api'
+import { compactCount } from '@/lib/format'
 import { GRADIENT } from '@/lib/themes'
 import { useThemePref } from './ThemeProvider'
 
 const { Text, Title } = Typography
 
-function compact(n: number | null | undefined): string {
-  if (n === null || n === undefined) return '—'
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 1)}M`
-  if (n >= 1_000) return `${(n / 1_000).toFixed(n >= 10_000 ? 0 : 1)}K`
-  return String(n)
-}
 
 function Stat({ label, value, testId }: { label: string; value: string; testId: string }) {
   const { tokens } = useThemePref()
@@ -61,11 +56,11 @@ export default function ProfileHeader({
         </Title>
 
         <Flex gap={22}>
-          <Stat testId="profile-stat-posts" label="posts" value={compact(profile?.post_count)} />
+          <Stat testId="profile-stat-posts" label="posts" value={compactCount(profile?.post_count) ?? '—'} />
           <Stat
             testId="profile-stat-followers"
             label="followers"
-            value={compact(profile?.followers_count)}
+            value={compactCount(profile?.followers_count) ?? '—'}
           />
           <Stat testId="profile-stat-indexed" label="indexed" value={String(indexed)} />
         </Flex>

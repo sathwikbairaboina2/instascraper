@@ -96,11 +96,17 @@ def handle_page_fetch(ctx: HandlerContext, payload: dict) -> None:
         )
         ctx.conn.execute(
             "INSERT INTO media_items (shortcode, username, kind, taken_at, caption,"
-            " is_video, child_count, ig_url, discovered_at, src_urls, src_urls_at)"
-            " VALUES (?,?,?,?,?,?,?,?,?,?,?)"
+            " is_video, child_count, ig_url, discovered_at, src_urls, src_urls_at,"
+            " like_count, comments_count, view_count)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
             " ON CONFLICT(shortcode) DO UPDATE SET"
             " caption=excluded.caption, child_count=excluded.child_count,"
-            " src_urls=excluded.src_urls, src_urls_at=excluded.src_urls_at",
+            " src_urls=excluded.src_urls, src_urls_at=excluded.src_urls_at,"
+            # Counts move after a post is published, so a re-index refreshes
+            # them rather than keeping whatever they were on first sight.
+            " like_count=excluded.like_count,"
+            " comments_count=excluded.comments_count,"
+            " view_count=excluded.view_count",
             (
                 post.shortcode,
                 username,
@@ -113,6 +119,9 @@ def handle_page_fetch(ctx: HandlerContext, payload: dict) -> None:
                 now_iso(),
                 sources_json,
                 now_iso(),
+                post.like_count,
+                post.comments_count,
+                post.view_count,
             ),
         )
 

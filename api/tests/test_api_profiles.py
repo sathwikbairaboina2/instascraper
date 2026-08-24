@@ -158,3 +158,20 @@ def test_media_summary_names_which_carousel_children_are_video(
     item = next(i for i in items if i["shortcode"] == shortcode)
 
     assert item["video_children"] == [2]
+
+
+def test_media_summary_carries_engagement(client, conn, settings, adapter):
+    seed(client, conn, settings, adapter)
+    shortcode = conn.execute("SELECT shortcode FROM media_items LIMIT 1").fetchone()[0]
+    conn.execute(
+        "UPDATE media_items SET like_count=101, comments_count=7, view_count=NULL"
+        " WHERE shortcode=?",
+        (shortcode,),
+    )
+
+    items = client.get("/api/profiles/nike/media").json()["items"]
+    item = next(i for i in items if i["shortcode"] == shortcode)
+
+    assert item["like_count"] == 101
+    assert item["comments_count"] == 7
+    assert item["view_count"] is None

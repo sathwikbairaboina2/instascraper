@@ -482,6 +482,17 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
                   { key: 'c', label: 'Shortcode', children: <Text code copyable style={{ fontSize: 11 }}>{one.shortcode}</Text> },
                   { key: 'k', label: 'Kind', children: one.child_count > 1 ? `carousel, ${one.child_count} slides` : one.kind },
                   { key: 't', label: 'Posted', children: one.taken_at.slice(0, 10) },
+                  // Exact here, shortened on the tile: the rail has room to
+                  // read a number properly.
+                  ...(one.like_count !== null
+                    ? [{ key: 'l', label: 'Likes', children: one.like_count.toLocaleString() }]
+                    : []),
+                  ...(one.comments_count !== null
+                    ? [{ key: 'm', label: 'Comments', children: one.comments_count.toLocaleString() }]
+                    : []),
+                  ...(one.view_count !== null
+                    ? [{ key: 'v', label: 'Views', children: one.view_count.toLocaleString() }]
+                    : []),
                   {
                     key: 's',
                     label: 'Cached',

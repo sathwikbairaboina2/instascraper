@@ -1,10 +1,19 @@
 'use client'
 
-import { CheckCircleFilled, ExpandOutlined, ReloadOutlined, ThunderboltOutlined } from '@ant-design/icons'
+import {
+  CheckCircleFilled,
+  CommentOutlined,
+  ExpandOutlined,
+  HeartFilled,
+  PlayCircleFilled,
+  ReloadOutlined,
+  ThunderboltOutlined,
+} from '@ant-design/icons'
 import { Button, Checkbox, Flex, Progress, Space, Tooltip, Typography, theme } from 'antd'
 import { useState } from 'react'
 
 import type { MediaSummary } from '@/lib/api'
+import { compactCount } from '@/lib/format'
 import { GRADIENT_LINEAR } from '@/lib/themes'
 
 const { Text } = Typography
@@ -129,6 +138,37 @@ export default function MediaTile({
           <CheckCircleFilled
             style={{ position: 'absolute', left: 10, bottom: 9, color: token.colorSuccess, fontSize: 14 }}
           />
+        )}
+
+        {show && !busy && item.full_status !== 'failed' && (
+          <Flex
+            gap={9}
+            align="center"
+            data-testid={`engagement-${item.shortcode}`}
+            style={{
+              position: 'absolute',
+              left: 9,
+              right: 9,
+              bottom: 8,
+              fontSize: 11,
+              fontWeight: 600,
+              color: '#fff',
+              textShadow: '0 1px 4px rgba(0,0,0,.9)',
+              pointerEvents: 'none',
+            }}
+          >
+            {item.like_count !== null && (
+              <span><HeartFilled /> {compactCount(item.like_count)}</span>
+            )}
+            {item.comments_count !== null && (
+              <span><CommentOutlined /> {compactCount(item.comments_count)}</span>
+            )}
+            {/* Reels only. A photo has no view count, and a zero here would
+                say nobody watched something that was never watchable. */}
+            {item.view_count !== null && (
+              <span><PlayCircleFilled /> {compactCount(item.view_count)}</span>
+            )}
+          </Flex>
         )}
 
         {marked && (

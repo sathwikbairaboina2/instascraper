@@ -100,6 +100,11 @@ class IgPost:
     child_count: int
     thumb_url: str
     ig_url: str
+    # Engagement as Business Discovery reports it. Views exist on reels and
+    # nowhere else, so None means "this kind of post has none", not zero.
+    like_count: int | None = None
+    comments_count: int | None = None
+    view_count: int | None = None
     sources: tuple[MediaSource, ...] = ()
 
 

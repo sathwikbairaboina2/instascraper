@@ -22,7 +22,8 @@ _PROFILE_FIELDS = (
 )
 _MEDIA_FIELDS = (
     "id,caption,media_type,media_product_type,media_url,thumbnail_url,"
-    "permalink,timestamp,children{id,media_type,media_url,thumbnail_url}"
+    "permalink,timestamp,like_count,comments_count,view_count,"
+    "children{id,media_type,media_url,thumbnail_url}"
 )
 
 _STALE_STATUSES = {403, 404, 410}

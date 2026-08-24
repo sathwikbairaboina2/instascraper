@@ -187,3 +187,41 @@ def test_a_carousel_keeps_the_children_that_do_have_urls():
     }
     sources = graph_map.post_from_node(node).sources
     assert [s.child_idx for s in sources] == [1, 3]
+
+
+def test_engagement_counts_are_mapped():
+    node = {
+        "media_type": "VIDEO",
+        "media_product_type": "REELS",
+        "media_url": "https://cdn/v.mp4",
+        "thumbnail_url": "https://cdn/t.jpg",
+        "permalink": "https://www.instagram.com/reel/AAAAAAAAAAA/",
+        "timestamp": "2026-08-20T14:03:11+0000",
+        "like_count": 73195,
+        "comments_count": 909,
+        "view_count": 3256857,
+    }
+    post = graph_map.post_from_node(node)
+
+    assert post.like_count == 73195
+    assert post.comments_count == 909
+    assert post.view_count == 3256857
+
+
+def test_a_photo_has_no_view_count_rather_than_zero():
+    """Business Discovery returns view_count for reels and omits it entirely
+    for feed posts. Zero would claim nobody watched something that was never
+    watchable."""
+    node = {
+        "media_type": "IMAGE",
+        "media_product_type": "FEED",
+        "media_url": "https://cdn/i.jpg",
+        "permalink": "https://www.instagram.com/p/AAAAAAAAAAA/",
+        "timestamp": "2026-08-20T14:03:11+0000",
+        "like_count": 72692,
+        "comments_count": 342,
+    }
+    post = graph_map.post_from_node(node)
+
+    assert post.like_count == 72692
+    assert post.view_count is None

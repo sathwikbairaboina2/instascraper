@@ -119,6 +119,11 @@ def post_from_node(node: dict) -> t.IgPost:
         thumb_url=_thumb_url(node),
         ig_url=permalink,
         sources=_sources(node),
+        # Absent rather than zero: a photo has no view count at all, and
+        # printing 0 would claim nobody watched it.
+        like_count=node.get("like_count"),
+        comments_count=node.get("comments_count"),
+        view_count=node.get("view_count"),
     )
 
 

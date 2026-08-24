@@ -47,6 +47,11 @@ export type MediaSummary = {
    *  is_video itself, so this is the only way to know. */
   video_children: number[]
   child_count: number
+  /** As Business Discovery reports it. Views exist on reels only, so null
+   *  means this kind of post has none rather than nobody watched. */
+  like_count: number | null
+  comments_count: number | null
+  view_count: number | null
   full_status: 'none' | 'queued' | 'fetching' | 'ready' | 'failed'
   full_error: string | null
   thumb_url: string

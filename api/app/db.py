@@ -64,6 +64,9 @@ _ADDED_COLUMNS = {
     "media_items": {
         "src_urls": "ALTER TABLE media_items ADD COLUMN src_urls TEXT",
         "src_urls_at": "ALTER TABLE media_items ADD COLUMN src_urls_at TEXT",
+        "like_count": "ALTER TABLE media_items ADD COLUMN like_count INTEGER",
+        "comments_count": "ALTER TABLE media_items ADD COLUMN comments_count INTEGER",
+        "view_count": "ALTER TABLE media_items ADD COLUMN view_count INTEGER",
     },
     "recreate_items": {
         "payload": "ALTER TABLE recreate_items ADD COLUMN payload TEXT",
