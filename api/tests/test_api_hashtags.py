@@ -100,3 +100,73 @@ def test_an_unknown_window_is_a_400(client):
 def test_an_empty_window_is_an_empty_list_not_an_error(client):
     body = client.get("/api/hashtags/trending?window=day").json()
     assert body == {"window": "day", "since": body["since"], "total": 0, "items": []}
+
+
+def test_tag_posts_returns_only_that_tags_posts(client, conn):
+    _insert(conn, "a", "#nike #run", hours_ago=2, likes=1)
+    _insert(conn, "b", "#run", hours_ago=3, likes=1)
+    _insert(conn, "c", "#other", hours_ago=4, likes=1)
+
+    body = client.get("/api/hashtags/run/posts?window=day").json()
+
+    assert body["tag"] == "run"
+    assert body["total"] == 2
+    assert {i["shortcode"] for i in body["items"]} == {"a", "b"}
+
+
+def test_tag_posts_are_newest_first(client, conn):
+    _insert(conn, "older", "#run", hours_ago=5)
+    _insert(conn, "newer", "#run", hours_ago=1)
+
+    body = client.get("/api/hashtags/run/posts?window=day").json()
+
+    assert [i["shortcode"] for i in body["items"]] == ["newer", "older"]
+
+
+def test_tag_posts_carry_the_grid_shape(client, conn):
+    _insert(conn, "a", "#run", hours_ago=1, likes=7, comments=2)
+    item = client.get("/api/hashtags/run/posts?window=day").json()["items"][0]
+    assert item["thumb_url"] == "/api/media/a/thumb"
+    assert item["like_count"] == 7
+    assert item["comments_count"] == 2
+    assert item["kind"] == "image"
+    assert item["video_children"] == []
+
+
+def test_tag_posts_match_case_insensitively_and_ignore_a_leading_hash(client, conn):
+    _insert(conn, "a", "#Nike", hours_ago=1)
+    for path in ("/api/hashtags/nike/posts", "/api/hashtags/%23NIKE/posts"):
+        body = client.get(f"{path}?window=day").json()
+        assert [i["shortcode"] for i in body["items"]] == ["a"], path
+
+
+def test_tag_posts_respect_the_window(client, conn):
+    _insert(conn, "old", "#run", hours_ago=48)
+    assert client.get("/api/hashtags/run/posts?window=day").json()["total"] == 0
+    assert client.get("/api/hashtags/run/posts?window=week").json()["total"] == 1
+
+
+def test_a_tag_nobody_used_is_empty_not_a_404(client):
+    res = client.get("/api/hashtags/nothinghere/posts?window=day")
+    assert res.status_code == 200
+    assert res.json()["total"] == 0
+    assert res.json()["items"] == []
+
+
+def test_tag_posts_page(client, conn):
+    for i in range(5):
+        _insert(conn, f"p{i}", "#run", hours_ago=i + 1)
+
+    first = client.get("/api/hashtags/run/posts?window=day&limit=2&offset=0").json()
+    second = client.get("/api/hashtags/run/posts?window=day&limit=2&offset=2").json()
+
+    assert first["total"] == 5
+    assert len(first["items"]) == 2 and len(second["items"]) == 2
+    overlap = {i["shortcode"] for i in first["items"]} & {
+        i["shortcode"] for i in second["items"]
+    }
+    assert overlap == set()
+
+
+def test_tag_posts_reject_an_unknown_window(client):
+    assert client.get("/api/hashtags/run/posts?window=year").status_code == 400

@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.main_deps import get_conn_dep
 from app.services import hashtags
+from app.services.media_view import media_summary
 
 router = APIRouter()
 
@@ -53,4 +54,36 @@ def trending(
         "since": since,
         "total": len(items),
         "items": items[offset : offset + limit],
+    }
+
+
+@router.get("/hashtags/{tag}/posts")
+def tag_posts(
+    tag: str,
+    window: str = Query("day"),
+    limit: int = Query(24, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    conn=Depends(get_conn_dep),
+):
+    """The posts carrying one tag, newest first.
+
+    A tag nobody used is an empty list rather than a 404: a tag that has
+    fallen out of the window is not an error, and this endpoint cannot
+    honestly tell that case apart from one that never existed.
+    """
+    since = _since(window)
+    wanted = tag.lstrip("#").casefold()
+
+    rows = conn.execute(
+        "SELECT * FROM media_items WHERE taken_at >= ?"
+        " ORDER BY taken_at DESC, shortcode",
+        (since,),
+    ).fetchall()
+    matched = [r for r in rows if wanted in hashtags.extract_tags(r["caption"])]
+
+    return {
+        "tag": wanted,
+        "window": window,
+        "total": len(matched),
+        "items": [media_summary(r) for r in matched[offset : offset + limit]],
     }
