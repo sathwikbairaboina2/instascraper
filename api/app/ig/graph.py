@@ -12,6 +12,7 @@ from urllib.parse import quote
 import httpx
 
 from app import paths
+from app.probe import dimensions
 from app.config import Settings
 from app.ig import graph_map, types as t
 
@@ -271,11 +272,15 @@ class GraphAdapter:
         if status >= 400 or not payload:
             raise t.IgTransient(f"CDN returned {status}")
         size = paths.atomic_write(dest, lambda fh: fh.write(payload))
+        # Read from the bytes we just wrote: the CDN does not tell us, and a
+        # payload that cannot say how big a picture is makes whoever receives
+        # it open every file to find out.
+        width, height = dimensions(dest) or (None, None)
         return t.SavedFile(
             child_idx=source.child_idx,
             path=dest,
             mime=source.mime,
             bytes=size,
-            width=None,
-            height=None,
+            width=width,
+            height=height,
         )

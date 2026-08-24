@@ -1,3 +1,5 @@
+import json
+
 from app.clock import now_iso
 from app.services import quota
 from app.worker import handlers
@@ -142,3 +144,61 @@ def test_ensure_still_queues_a_photo_when_the_reel_cap_is_spent(
     body = client.post("/api/media/ensure", json={"shortcodes": [shortcode]}).json()
 
     assert body["statuses"][shortcode] == "queued"
+
+
+def test_a_slide_can_be_previewed_before_it_is_downloaded(
+    client, conn, settings, adapter
+):
+    """A carousel is chosen slide by slide, and choosing blind is the thing
+    this avoids: the urls are recorded at index time, so the picker does not
+    have to spend a download first."""
+    seed(conn, settings, adapter)
+    shortcode = conn.execute("SELECT shortcode FROM media_items LIMIT 1").fetchone()[0]
+    conn.execute(
+        "UPDATE media_items SET full_status='none', src_urls=? WHERE shortcode=?",
+        (
+            json.dumps(
+                [
+                    {"child_idx": 1, "url": "https://cdn/a.jpg", "mime": "image/jpeg", "is_video": False},
+                    {"child_idx": 2, "url": "https://cdn/b.mp4", "mime": "video/mp4", "is_video": True},
+                ]
+            ),
+            shortcode,
+        ),
+    )
+
+    res = client.get(
+        f"/api/media/{shortcode}/preview?child=1", follow_redirects=False
+    )
+
+    assert res.status_code == 307
+    assert res.headers["location"] == "https://cdn/a.jpg"
+
+
+def test_a_video_slide_has_no_still_to_preview(client, conn, settings, adapter):
+    seed(conn, settings, adapter)
+    shortcode = conn.execute("SELECT shortcode FROM media_items LIMIT 1").fetchone()[0]
+    conn.execute(
+        "UPDATE media_items SET src_urls=? WHERE shortcode=?",
+        (
+            json.dumps(
+                [{"child_idx": 1, "url": "https://cdn/b.mp4", "mime": "video/mp4", "is_video": True}]
+            ),
+            shortcode,
+        ),
+    )
+
+    res = client.get(f"/api/media/{shortcode}/preview?child=1", follow_redirects=False)
+
+    assert res.status_code == 404
+
+
+def test_previewing_a_slide_that_was_never_recorded_is_a_404(
+    client, conn, settings, adapter
+):
+    seed(conn, settings, adapter)
+    shortcode = conn.execute("SELECT shortcode FROM media_items LIMIT 1").fetchone()[0]
+
+    res = client.get(f"/api/media/{shortcode}/preview?child=99", follow_redirects=False)
+
+    assert res.status_code == 404

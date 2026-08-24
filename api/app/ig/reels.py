@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Callable
 
 from app.config import Settings
+from app.probe import dimensions
 from app.ig import types as t
 from app.worker.pacer import Pacer
 
@@ -100,11 +101,12 @@ class ReelDownloader:
             # not there.
             raise t.IgTransient("yt-dlp reported success but wrote no file")
 
+        width, height = dimensions(dest) or (None, None)
         return t.SavedFile(
             child_idx=0,
             path=dest,
             mime="video/mp4",
             bytes=dest.stat().st_size,
-            width=None,
-            height=None,
+            width=width,
+            height=height,
         )

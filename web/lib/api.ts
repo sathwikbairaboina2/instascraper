@@ -112,13 +112,38 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
     headers: { 'content-type': 'application/json', ...(init?.headers ?? {}) },
   })
   const text = await res.text()
-  const body = text ? JSON.parse(text) : null
+
+  // Not every failure is json. FastAPI answers an unhandled exception with
+  // the plain text "Internal Server Error", and a proxy in front of it can
+  // answer with html. Parsing those blindly turns any server fault into
+  // "Unexpected token 'I'", which describes the parser rather than the
+  // problem and sends you looking in the wrong place.
+  let body: unknown = null
+  let unparsed: string | null = null
+  if (text) {
+    try {
+      body = JSON.parse(text)
+    } catch {
+      unparsed = text
+    }
+  }
+
   if (!res.ok) {
-    const detail = body?.detail
+    const detail = (body as { detail?: unknown } | null)?.detail
     const message =
-      typeof detail === 'string' ? detail : detail?.message ?? `request failed (${res.status})`
+      typeof detail === 'string'
+        ? detail
+        : ((detail as { message?: string } | undefined)?.message ??
+          (unparsed ? `${res.status} ${res.statusText}: ${unparsed.slice(0, 200)}` : null) ??
+          `request failed (${res.status})`)
     throw new ApiError(res.status, body, message)
   }
+
+  if (unparsed !== null) {
+    // A 200 that is not json is still broken, just less obviously.
+    throw new ApiError(res.status, null, `expected json, got: ${unparsed.slice(0, 200)}`)
+  }
+
   return body as T
 }
 

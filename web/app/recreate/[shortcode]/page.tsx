@@ -24,6 +24,43 @@ type Phase = 'idle' | 'fetching' | 'preparing' | 'done' | 'error'
 
 const POLL_MS = 1500
 
+function SlideImage({
+  shortcode,
+  child,
+  cached,
+  dim,
+}: {
+  shortcode: string
+  child: number
+  cached: boolean
+  dim: boolean
+}) {
+  const [failed, setFailed] = useState(false)
+  if (failed) return null
+
+  const src = cached
+    ? `/api/media/${shortcode}/full?child=${child}`
+    : `/api/media/${shortcode}/preview?child=${child}`
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt=""
+      data-testid={`slide-image-${child}`}
+      onError={() => setFailed(true)}
+      style={{
+        position: 'absolute',
+        inset: 0,
+        width: '100%',
+        height: '100%',
+        objectFit: 'cover',
+        opacity: dim ? 0.45 : 1,
+      }}
+    />
+  )
+}
+
 export default function RecreateItemPage({
   params,
 }: {
@@ -158,9 +195,10 @@ export default function RecreateItemPage({
                 <Text style={{ fontSize: 11, letterSpacing: '.1em', color: tokens.textSecondary }}>
                   SLIDES
                 </Text>
-                {/* Before the post is downloaded there are no per-slide
-                    images -- the cached thumbnail is the cover. Numbers are
-                    what we can honestly offer until then. */}
+                {/* Slides can be looked at before anything is downloaded:
+                    the urls are recorded when the post is indexed. They
+                    expire, so a dead one falls back to the number rather
+                    than a broken frame. */}
                 <Flex gap={7} wrap>
                   {Array.from({ length: source?.child_count ?? 0 }, (_, n) => n + 1).map((n) => {
                     const on = chosen.includes(n)
@@ -180,8 +218,8 @@ export default function RecreateItemPage({
                         }
                         style={{
                           cursor: 'pointer',
-                          minWidth: 56,
-                          height: 56,
+                          minWidth: 72,
+                          height: 72,
                           borderRadius: 8,
                           display: 'grid',
                           placeItems: 'center',
@@ -194,21 +232,17 @@ export default function RecreateItemPage({
                           overflow: 'hidden',
                         }}
                       >
-                        {cached ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={`/api/media/${shortcode}/full?child=${n}`}
-                            alt=""
-                            style={{
-                              position: 'absolute',
-                              inset: 0,
-                              width: '100%',
-                              height: '100%',
-                              objectFit: 'cover',
-                              opacity: on ? 1 : 0.45,
-                            }}
-                          />
-                        ) : null}
+                        {/* Downloaded slides come from disk; the rest from
+                            the urls recorded at index time, so a carousel can
+                            be looked at before it is fetched. Either can be
+                            missing, and then the number is what is left to
+                            show. */}
+                        <SlideImage
+                          shortcode={shortcode}
+                          child={n}
+                          cached={cached}
+                          dim={!on}
+                        />
                         <span style={{ position: 'relative', textShadow: '0 1px 3px rgba(0,0,0,.8)' }}>
                           {on ? <CheckOutlined /> : n}
                         </span>

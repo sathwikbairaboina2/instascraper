@@ -1,5 +1,7 @@
+import json
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from pydantic import BaseModel
 
 from app.clock import now_iso
@@ -127,3 +129,34 @@ def ensure(body: EnsureBody, request: Request, conn=Depends(get_conn_dep)):
         "ready": sum(1 for s in statuses.values() if s == "ready"),
         "total": len(statuses),
     }
+
+
+@router.get("/media/{shortcode}/preview")
+def get_preview(shortcode: str, child: int = 0, conn=Depends(get_conn_dep)):
+    """Point at the source image for one slide, before anything is downloaded.
+
+    Business Discovery hands us a url per child when the post is indexed, so
+    a carousel can be previewed slide by slide without spending a download
+    first. Those urls expire, which is why this redirects rather than
+    promising to serve the bytes: a dead one fails as a broken image the
+    caller can fall back from, not as a cached wrong answer.
+    """
+    row = conn.execute(
+        "SELECT src_urls FROM media_items WHERE shortcode=?", (shortcode,)
+    ).fetchone()
+    if row is None or not row["src_urls"]:
+        raise HTTPException(status_code=404, detail={"message": "no sources recorded"})
+
+    for entry in json.loads(row["src_urls"]):
+        if int(entry.get("child_idx", 0)) != child:
+            continue
+        url = entry.get("url")
+        if not url:
+            break
+        if entry.get("is_video"):
+            # A video slide has no still to show; the caller draws its own
+            # placeholder rather than being handed an mp4 to put in an img.
+            raise HTTPException(status_code=404, detail={"message": "slide is a video"})
+        return RedirectResponse(url, status_code=307)
+
+    raise HTTPException(status_code=404, detail={"message": "no such slide"})
