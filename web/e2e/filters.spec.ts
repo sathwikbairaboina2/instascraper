@@ -1,6 +1,8 @@
 import { expect, test } from '@playwright/test'
 
-// Seeded dataset: nike-0..nike-5 photos, nike-6 and nike-7 three-slide carousels.
+// Seeded dataset: nike-0..nike-5 photos, nike-6 and nike-7 three-slide
+// carousels, nike-8 and nike-9 reels. POSTS is the default tab and holds the
+// eight non-reels.
 
 test.afterEach(async ({ page }) => {
   await page.unrouteAll({ behavior: 'ignoreErrors' })
@@ -9,25 +11,10 @@ test.afterEach(async ({ page }) => {
 const tiles = (page: import('@playwright/test').Page) =>
   page.getByTestId('media-grid').locator('.tile')
 
-// antd Segmented renders labelled radios, not a native <select>.
-const pickKind = (page: import('@playwright/test').Page, label: string) =>
-  page.getByTestId('filter-kind').getByText(label, { exact: true }).click()
-
-test('kind filter narrows the grid to carousels', async ({ page }) => {
-  await page.goto('/p/nike')
-  await expect(tiles(page)).toHaveCount(8)
-
-  await pickKind(page, 'Carousels')
-
-  await expect(tiles(page)).toHaveCount(2)
-  await expect(page.getByTestId('filter-count')).toHaveText('2 of 8 shown')
-})
-
-test('photos filter excludes the carousels', async ({ page }) => {
-  await page.goto('/p/nike')
-  await pickKind(page, 'Photos')
-  await expect(tiles(page)).toHaveCount(6)
-})
+// antd Segmented renders labelled radios, not a native <select>. The label,
+// not the input, is what is actually clickable.
+const pickTab = (page: import('@playwright/test').Page, label: string) =>
+  page.getByTestId('profile-tabs').getByText(label, { exact: true }).click()
 
 test('caption search filters by text', async ({ page }) => {
   await page.goto('/p/nike')
@@ -42,9 +29,11 @@ test('cached-only keeps exactly the downloaded items', async ({ page }) => {
   await page.route('**/api/profiles/nike/media**', async (route) => {
     const res = await route.fetch()
     const body = await res.json()
+    // The three oldest are photos. Marking the newest three would mark the
+    // two reels, which the POSTS tab excludes anyway.
     body.items = body.items.map((i: Record<string, unknown>, idx: number) => ({
       ...i,
-      full_status: idx < 3 ? 'ready' : 'none',
+      full_status: idx >= body.items.length - 3 ? 'ready' : 'none',
     }))
     await route.fulfill({ response: res, json: body })
   })
@@ -60,7 +49,7 @@ test('cached-only keeps exactly the downloaded items', async ({ page }) => {
 
 test('reset restores the full grid', async ({ page }) => {
   await page.goto('/p/nike')
-  await pickKind(page, 'Carousels')
+  await pickTab(page, 'REELS')
   await expect(tiles(page)).toHaveCount(2)
 
   await page.getByTestId('filter-reset').click()
@@ -70,7 +59,7 @@ test('reset restores the full grid', async ({ page }) => {
 
 test('select all respects the active filter', async ({ page }) => {
   await page.goto('/p/nike')
-  await pickKind(page, 'Carousels')
+  await pickTab(page, 'REELS')
   await page.getByTestId('select-all').click()
 
   await expect(page.getByTestId('selection-count')).toHaveText('2 selected')

@@ -193,4 +193,6 @@ def seeded_adapter() -> FakeAdapter:
     adapter.add_profile("nike", post_count=8)
     adapter.add_posts("nike", count=6)
     adapter.add_posts("nike", count=2, child_count=3)
+    # Two reels: without them the REELS tab has nothing to prove itself on.
+    adapter.add_posts("nike", count=2, video=True)
     return adapter

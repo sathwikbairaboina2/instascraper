@@ -55,7 +55,13 @@ import {
   saveSelection,
   type SavedSelection,
 } from '@/lib/savedSelections'
-import { applyFilters, EMPTY_FILTERS, type Filters, type KindFilter } from '@/lib/useFilters'
+import {
+  applyFilters,
+  EMPTY_FILTERS,
+  matchesKind,
+  type Filters,
+  type KindFilter,
+} from '@/lib/useFilters'
 import { usePolling } from '@/lib/usePolling'
 import { useSelection } from '@/lib/useSelection'
 
@@ -98,13 +104,21 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
 
   const items = useMemo(() => media?.items ?? [], [media])
   const visible = useMemo(() => applyFilters(items, filters), [items, filters])
+  // The tab is the partition, not a filter within one. "2 of 10" on the
+  // reels tab counts posts the tab was never going to show; the honest
+  // denominator is what the tab holds before search and cached-only
+  // narrow it further.
+  const inTab = useMemo(
+    () => items.filter((item) => matchesKind(item, filters.kind)),
+    [items, filters.kind],
+  )
   const ids = useMemo(() => visible.map((i) => i.shortcode), [visible])
   const selection = useSelection(ids)
 
   const set = <K extends keyof Filters>(key: K, value: Filters[K]) =>
     setFilters((prev) => ({ ...prev, [key]: value }))
   const filtersActive =
-    filters.kind !== 'all' || filters.cachedOnly || filters.query.trim() !== ''
+    filters.kind !== 'posts' || filters.cachedOnly || filters.query.trim() !== ''
 
   const onRetry = useCallback(
     async (shortcode: string) => {
@@ -226,14 +240,13 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
       >
         <Segmented
           size="small"
-          data-testid="filter-kind"
+          data-testid="profile-tabs"
           value={filters.kind}
           onChange={(v) => set('kind', v as KindFilter)}
           options={[
-            { value: 'all', label: 'All' },
-            { value: 'image', label: 'Photos' },
-            { value: 'video', label: 'Video' },
-            { value: 'carousel', label: 'Carousels' },
+            { value: 'posts', label: 'POSTS' },
+            { value: 'reels', label: 'REELS' },
+            { value: 'saved', label: 'SAVED' },
           ]}
         />
         <Input
@@ -255,7 +268,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
         </Checkbox>
         <div style={{ flex: 1 }} />
         <Text type="secondary" style={{ fontSize: 12 }} data-testid="filter-count">
-          {visible.length} of {items.length} shown
+          {visible.length} of {inTab.length} shown
         </Text>
         {filtersActive && (
           <Button size="small" data-testid="filter-reset" onClick={() => setFilters(EMPTY_FILTERS)}>

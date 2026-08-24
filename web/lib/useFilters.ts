@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react'
 
 import type { MediaSummary } from '@/lib/api'
 
-export type KindFilter = 'all' | 'image' | 'video' | 'carousel'
+export type KindFilter = 'posts' | 'reels' | 'saved'
 
 export type Filters = {
   kind: KindFilter
@@ -12,14 +12,15 @@ export type Filters = {
   query: string
 }
 
-export const EMPTY_FILTERS: Filters = { kind: 'all', cachedOnly: false, query: '' }
+export const EMPTY_FILTERS: Filters = { kind: 'posts', cachedOnly: false, query: '' }
 
-/** Reels count as video -- the distinction matters to Instagram, not to someone
- *  scanning a grid for moving pictures. */
+/** Instagram splits a profile by the surface a post was published to, not by
+ *  file type. Saved is ours rather than Instagram's: what this app has
+ *  actually pulled down. */
 export function matchesKind(item: MediaSummary, kind: KindFilter): boolean {
-  if (kind === 'all') return true
-  if (kind === 'video') return item.kind === 'video' || item.kind === 'reel'
-  return item.kind === kind
+  if (kind === 'reels') return item.kind === 'reel'
+  if (kind === 'saved') return item.full_status === 'ready'
+  return item.kind !== 'reel'
 }
 
 export function applyFilters(items: MediaSummary[], filters: Filters): MediaSummary[] {
@@ -36,7 +37,7 @@ export function useFilters(items: MediaSummary[]) {
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS)
   const visible = useMemo(() => applyFilters(items, filters), [items, filters])
   const active =
-    filters.kind !== 'all' || filters.cachedOnly || filters.query.trim() !== ''
+    filters.kind !== 'posts' || filters.cachedOnly || filters.query.trim() !== ''
 
   return {
     filters,
