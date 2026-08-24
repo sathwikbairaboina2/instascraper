@@ -142,20 +142,30 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
   const set = <K extends keyof Filters>(key: K, value: Filters[K]) =>
     setFilters((prev) => ({ ...prev, [key]: value }))
 
-  // Some accounts post almost nothing but reels, and POSTS is a poor first
-  // impression when it holds one tile out of twelve. Open on whichever tab
-  // has something in it -- but only before a tab has been picked, because an
-  // empty grid you asked for is an answer, not a mistake to correct.
+  // Some accounts post almost nothing but reels, and POSTS opening on one
+  // tile out of twelve is a poor first impression. Open on whichever tab
+  // holds more.
+  //
+  // Re-decided on every payload rather than latched on the first: the page
+  // arrives a thumbnail at a time, newest first, so an early list can be all
+  // reels for an account that mostly posts photos. Waiting for the count to
+  // settle does not work here -- usePolling deliberately skips re-rendering
+  // an unchanged payload, so "the same list twice" is a render that never
+  // comes. Deciding again each time data actually changes converges on the
+  // right answer and stops when the data does.
+  //
+  // Stops entirely once a tab is chosen: an empty grid you asked for is an
+  // answer, not a mistake to correct.
   const tabPicked = useRef(false)
   useEffect(() => {
     tabPicked.current = false
   }, [username])
   useEffect(() => {
-    if (tabPicked.current || items.length === 0 || filters.kind !== 'posts') return
-    tabPicked.current = true
-    const hasPosts = items.some((item) => matchesKind(item, 'posts'))
-    const hasReels = items.some((item) => matchesKind(item, 'reels'))
-    if (!hasPosts && hasReels) setFilters((prev) => ({ ...prev, kind: 'reels' }))
+    if (tabPicked.current || items.length === 0) return
+    const posts = items.filter((item) => matchesKind(item, 'posts')).length
+    const reels = items.filter((item) => matchesKind(item, 'reels')).length
+    const want: KindFilter = reels > posts ? 'reels' : 'posts'
+    if (want !== filters.kind) setFilters((prev) => ({ ...prev, kind: want }))
   }, [items, filters.kind])
   const filtersActive =
     filters.kind !== 'posts' || filters.cachedOnly || filters.query.trim() !== ''

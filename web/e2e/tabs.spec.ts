@@ -57,6 +57,17 @@ test('the header reports posts, followers and indexed', async ({ page }) => {
   await expect(page.getByTestId('profile-stat-indexed')).toContainText('10')
 })
 
+test('a profile that is mostly posts stays on posts', async ({ page }) => {
+  // The seed is eight posts to two reels. Nothing to switch to.
+  await page.goto('/p/nike')
+
+  await expect(page.getByTestId('profile-tabs').getByText('POSTS', { exact: true })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  )
+  await expect(tiles(page)).toHaveCount(8)
+})
+
 test('a profile with no feed posts opens on reels rather than an empty grid', async ({
   page,
 }) => {
