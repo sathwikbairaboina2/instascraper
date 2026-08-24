@@ -13,12 +13,16 @@ router = APIRouter()
 def get_status(request: Request, conn=Depends(get_conn_dep)):
     worker = getattr(request.app.state, "worker", None)
     current = request.app.state.runtime.current
+    # The fake adapter never calls Meta. A 0% there would read as a real
+    # measurement rather than an absent one.
+    usage = getattr(current.adapter, "usage", None)
     return {
         "worker": "running" if worker is not None and worker.is_alive() else "stopped",
         "adapter": current.name,
         "token_configured": bool(current.settings.graph_token),
         "breaker": request.app.state.breaker.state(),
         "queue_depth": queue.depth(conn),
+        "usage": usage,
     }
 
 

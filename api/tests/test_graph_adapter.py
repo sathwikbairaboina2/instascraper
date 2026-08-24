@@ -315,3 +315,31 @@ def test_adapter_defaults_to_graph(monkeypatch):
 
     monkeypatch.delenv("IG_ADAPTER", raising=False)
     assert load_settings().adapter == "graph"
+
+
+def test_usage_reflects_the_latest_reading_not_the_peak(graph_settings):
+    """The hourly window resets; a readout that only climbs would lie."""
+    transport = Transport(
+        (200, {"x-app-usage": '{"call_count":80}'}, load("media_page.json")),
+        (200, {"x-app-usage": '{"call_count":5}'}, load("media_page.json")),
+    )
+    adapter = GraphAdapter(graph_settings, transport=transport)
+
+    adapter.fetch_page("nike", None, 3)
+    assert adapter.usage == 80.0
+
+    adapter.fetch_page("nike", "c", 3)
+    assert adapter.usage == 5.0
+    assert adapter.usage_peak == 80.0
+
+
+def test_the_backoff_guard_still_reads_the_peak(graph_settings):
+    """A dropped reading must not hand back a call we already refused."""
+    transport = Transport(
+        (200, {"x-app-usage": '{"call_count":95}'}, load("media_page.json")),
+    )
+    adapter = GraphAdapter(graph_settings, transport=transport)
+    adapter.fetch_page("nike", None, 3)
+
+    with pytest.raises(t.IgRateLimited):
+        adapter.fetch_page("nike", "c", 3)

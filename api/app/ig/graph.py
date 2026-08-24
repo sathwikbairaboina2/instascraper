@@ -127,6 +127,17 @@ class GraphAdapter:
         self._transport = transport or _httpx_transport
         self._fetcher = fetcher or _httpx_fetcher
         self._usage = 0.0
+        self._usage_peak = 0.0
+
+    @property
+    def usage(self) -> float:
+        """Meta's latest reported percentage of the hourly quota."""
+        return self._usage
+
+    @property
+    def usage_peak(self) -> float:
+        """Highest reading seen this process. What the backoff guard trusts."""
+        return self._usage_peak
 
     # ---- transport -----------------------------------------------------
     def _get(self, fields: str) -> dict:
@@ -135,9 +146,9 @@ class GraphAdapter:
                 "IG_GRAPH_TOKEN and IG_GRAPH_USER_ID must be set to use the Graph adapter."
             )
         # Refuse to spend a call we already know is close to the ceiling.
-        if self._usage >= self._settings.graph_usage_limit:
+        if self._usage_peak >= self._settings.graph_usage_limit:
             raise t.IgRateLimited(
-                f"app usage at {self._usage:.0f}% of Meta's limit; backing off"
+                f"app usage at {self._usage_peak:.0f}% of Meta's limit; backing off"
             )
 
         url = (
@@ -154,7 +165,10 @@ class GraphAdapter:
         except Exception as exc:
             raise t.IgTransient(redact(str(exc), self._settings.graph_token)) from exc
 
-        self._usage = max(self._usage, usage_percent(response_headers))
+        # Latest for the readout, peak for the guard: the hourly window
+        # resets, so a figure that only ever climbs stops being true.
+        self._usage = usage_percent(response_headers)
+        self._usage_peak = max(self._usage_peak, self._usage)
         if status >= 400 or "error" in body:
             raise classify(status, body, response_headers, self._settings.graph_token)
         return body

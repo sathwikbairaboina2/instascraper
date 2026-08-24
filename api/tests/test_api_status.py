@@ -115,3 +115,8 @@ def test_fake_data_never_reaches_the_graph_root(settings):
     runtime.prepare_data_root(active)
     assert active.db_path.exists()
     assert not base.db_path.exists(), "fake wrote into the graph root"
+
+
+def test_status_reports_no_usage_for_an_adapter_that_does_not_track_it(client):
+    """The fake adapter never calls Meta; inventing a 0% would read as fact."""
+    assert client.get("/api/status").json()["usage"] is None
