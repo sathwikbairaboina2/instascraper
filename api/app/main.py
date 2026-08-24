@@ -9,6 +9,7 @@ from app.config import Settings, load_settings
 from app.ig.factory import make_adapter
 from app.routes import activity as activity_routes
 from app.routes import downloads as download_routes
+from app.routes import hashtags as hashtag_routes
 from app.routes import health as health_routes
 from app.routes import media as media_routes
 from app.routes import profiles as profile_routes
@@ -72,6 +73,7 @@ def create_app(
     app.include_router(profile_routes.router, prefix="/api")
     app.include_router(media_routes.router, prefix="/api")
     app.include_router(download_routes.router, prefix="/api")
+    app.include_router(hashtag_routes.router, prefix="/api")
     app.include_router(health_routes.router, prefix="/api")
     return app
 
