@@ -6,7 +6,6 @@ import {
   FolderOpenOutlined,
   InboxOutlined,
   SearchOutlined,
-  ThunderboltFilled,
 } from '@ant-design/icons'
 import {
   Alert,
@@ -29,6 +28,7 @@ import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 
 import { clearBreaker, getProfiles, getStatus, setAdapter, syncProfile } from '@/lib/api'
+import { GRADIENT, GRADIENT_LINEAR } from '@/lib/themes'
 import { usePolling } from '@/lib/usePolling'
 import UsageMeter from './UsageMeter'
 import { useThemePref } from './ThemeProvider'
@@ -83,13 +83,21 @@ export default function AppShell({
   return (
     <Layout style={{ height: '100dvh', overflow: 'hidden' }}>
       <Sider
-        width={230}
+        width={208}
         style={{ background: token.colorBgContainer, borderRight: `1px solid ${token.colorBorderSecondary}` }}
       >
         <Flex vertical style={{ height: '100%' }}>
           <Link href="/" style={{ color: 'inherit' }}>
             <Flex align="center" gap={9} style={{ height: 52, padding: '0 16px', flex: 'none' }}>
-              <ThunderboltFilled style={{ color: token.colorPrimary, fontSize: 15 }} />
+              <span
+                style={{
+                  width: 18,
+                  height: 18,
+                  borderRadius: 6,
+                  background: GRADIENT_LINEAR,
+                  flex: 'none',
+                }}
+              />
               <Text strong style={{ letterSpacing: '-0.02em' }}>instascraper</Text>
             </Flex>
           </Link>
@@ -137,7 +145,19 @@ export default function AppShell({
                       background: on ? token.colorFillSecondary : 'transparent',
                     }}
                   >
-                    <Avatar size={24} src={p.avatar_url} />
+                    {/* The ring marks which profile you are looking at, the way
+                        Instagram marks an unwatched story. */}
+                    <div
+                      style={{
+                        borderRadius: '50%',
+                        padding: on ? 2 : 0,
+                        background: on ? GRADIENT : 'transparent',
+                        flex: 'none',
+                        lineHeight: 0,
+                      }}
+                    >
+                      <Avatar size={on ? 22 : 24} src={p.avatar_url} />
+                    </div>
                     <Text style={{ flex: 1, fontSize: 13, fontWeight: on ? 600 : 400 }} ellipsis>
                       {p.username}
                     </Text>
@@ -172,9 +192,6 @@ export default function AppShell({
             borderBottom: `1px solid ${token.colorBorderSecondary}`,
           }}
         >
-          <Text type="secondary" style={{ fontSize: 11, letterSpacing: '.06em' }}>
-            DATA
-          </Text>
           <Segmented
             size="small"
             // Switching is off for now: Graph is the only source in use. The

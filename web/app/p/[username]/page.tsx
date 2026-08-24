@@ -152,7 +152,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
   const fileCount = selectedItems.reduce((n, i) => n + (i.child_count || 1), 0)
   const pending = selectedItems.length - readyCount
 
-  const tile = density === 'Compact' ? 112 : 158
+  const tile = density === 'Compact' ? 158 : 232
 
   if (error) {
     return (
@@ -227,6 +227,42 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
         }
       />
 
+      {/* Instagram's centred bar with the active item underlined from above.
+          A Segmented chip read as one more filter; this reads as a section. */}
+      <Flex
+        justify="center"
+        gap={44}
+        data-testid="profile-tabs"
+        style={{
+          flex: 'none',
+          borderBottom: `1px solid ${token.colorBorderSecondary}`,
+        }}
+      >
+        {(['posts', 'reels', 'saved'] as KindFilter[]).map((kind) => {
+          const on = filters.kind === kind
+          return (
+            <div
+              key={kind}
+              role="tab"
+              aria-selected={on}
+              onClick={() => set('kind', kind)}
+              style={{
+                cursor: 'pointer',
+                padding: '11px 0 9px',
+                marginTop: -1,
+                borderTop: `1px solid ${on ? token.colorText : 'transparent'}`,
+                fontSize: 11,
+                fontWeight: 600,
+                letterSpacing: '.1em',
+                color: on ? token.colorText : token.colorTextSecondary,
+              }}
+            >
+              {kind.toUpperCase()}
+            </div>
+          )
+        })}
+      </Flex>
+
       <Flex
         align="center"
         gap={10}
@@ -238,17 +274,6 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
           borderBottom: `1px solid ${token.colorBorderSecondary}`,
         }}
       >
-        <Segmented
-          size="small"
-          data-testid="profile-tabs"
-          value={filters.kind}
-          onChange={(v) => set('kind', v as KindFilter)}
-          options={[
-            { value: 'posts', label: 'POSTS' },
-            { value: 'reels', label: 'REELS' },
-            { value: 'saved', label: 'SAVED' },
-          ]}
-        />
         <Input
           size="small"
           data-testid="filter-query"

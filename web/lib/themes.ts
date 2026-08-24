@@ -17,7 +17,7 @@ export const IG: { dark: Tokens; light: Tokens } = {
     hairline: '#262626',
     text: '#f5f5f5',
     textSecondary: '#a8a8a8',
-    action: '#0095f6',
+    action: '#e1306c',
     destructive: '#ed4956',
   },
   light: {
@@ -26,15 +26,22 @@ export const IG: { dark: Tokens; light: Tokens } = {
     hairline: '#dbdbdb',
     text: '#000000',
     textSecondary: '#737373',
-    action: '#0095f6',
+    action: '#e1306c',
     destructive: '#ed4956',
   },
 }
 
-/** The story ring, and nothing else. Instagram spends this sparingly and so
- *  do we: on buttons and headers it stops reading as Instagram and starts
- *  reading as an imitation of it. */
+/** The story ring: a cone, so the sweep reads as a ring rather than a wipe. */
 export const GRADIENT = 'conic-gradient(from 200deg, #fcb045, #fd1d1d, #833ab4, #fcb045)'
+
+/** The same colours as a linear sweep, for anything rectangular: primary
+ *  buttons, the active tab, the logo mark.
+ *
+ *  antd's `colorPrimary` takes one colour, not a gradient, so this cannot
+ *  reach a focus ring, a checkbox tick or a 1px border. Those fall back to
+ *  `action`, which is the magenta sampled from the middle of this sweep so
+ *  the two read as the same family. */
+export const GRADIENT_LINEAR = 'linear-gradient(135deg, #fcb045, #fd1d1d, #833ab4)'
 
 const KEY = 'instascraper:theme'
 

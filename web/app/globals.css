@@ -20,3 +20,34 @@ a { color: inherit; text-decoration: none; }
     transition-duration: 0.001ms !important;
   }
 }
+
+/* The gradient primary.
+ *
+ * antd drives every control from a single `colorPrimary`, so the gradient
+ * cannot come from a theme token -- it has to be painted on the surfaces
+ * broad enough to hold it. Focus rings, checkbox ticks and 1px borders keep
+ * the solid magenta from `tokens.action`, which is sampled from the middle
+ * of this sweep so the two read as one family. */
+.ant-btn-primary:not(:disabled) {
+  background-image: linear-gradient(135deg, #fcb045, #fd1d1d, #833ab4);
+  border-color: transparent;
+}
+
+.ant-btn-primary:not(:disabled):hover {
+  /* antd lightens the flat colour on hover; with an image on top that does
+   * nothing, so the lift comes from opacity instead. */
+  opacity: 0.88;
+  border-color: transparent;
+}
+
+/* Scoped away from disabled controls: a dead Segmented keeps its flat
+ * selected chip, and white-on-flat would erase the label naming the live
+ * dataset. */
+.ant-segmented:not(.ant-segmented-disabled) .ant-segmented-item-selected {
+  background-image: linear-gradient(135deg, #fcb045, #fd1d1d, #833ab4);
+}
+
+.ant-segmented:not(.ant-segmented-disabled) .ant-segmented-item-selected,
+.ant-segmented:not(.ant-segmented-disabled) .ant-segmented-item-selected .ant-segmented-item-label {
+  color: #fff;
+}
