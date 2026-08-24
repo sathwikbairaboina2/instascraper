@@ -30,6 +30,7 @@ import { useState } from 'react'
 
 import { clearBreaker, getProfiles, getStatus, setAdapter, syncProfile } from '@/lib/api'
 import { usePolling } from '@/lib/usePolling'
+import UsageMeter from './UsageMeter'
 import { useThemePref } from './ThemeProvider'
 
 const { Sider } = Layout
@@ -192,6 +193,7 @@ export default function AppShell({
           />
           <div style={{ flex: 1 }} />
           <Badge status={status?.worker === 'running' ? 'processing' : 'default'} />
+          <UsageMeter usage={status?.usage} />
           <Button size="small" type="text" onClick={() => setQueueOpen(true)}>
             Queue {status?.queue_depth ?? 0}
           </Button>

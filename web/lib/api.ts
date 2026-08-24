@@ -9,6 +9,9 @@ export type StatusBody = {
     seconds_remaining: number | null
   }
   queue_depth: number
+  /** Percentage of Meta's hourly quota spent, as Meta last reported it.
+   *  Null when the live adapter never calls Meta. */
+  usage: number | null
 }
 
 export type ProfileSummary = {
