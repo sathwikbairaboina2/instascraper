@@ -1,4 +1,3 @@
-import json
 import shutil
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -7,6 +6,7 @@ from pydantic import BaseModel
 
 from app.main_deps import get_conn_dep, wake_worker
 from app.services import activity
+from app.services.media_view import media_summary
 from app.worker import queue
 
 router = APIRouter()
@@ -24,40 +24,6 @@ def _last_error(conn, username: str) -> str | None:
         (username,),
     ).fetchone()
     return row["error"] if row else None
-
-
-def _video_children(row) -> list[int]:
-    """Which slides of a carousel are video.
-
-    `is_video` describes the post, and a carousel is never one even when it
-    holds a video slide. Without this the viewer has no way to tell which
-    child to render as video, so it renders every slide as an image and the
-    video ones break.
-    """
-    try:
-        entries = json.loads(row["src_urls"] or "[]")
-    except (TypeError, ValueError):
-        return []
-    return [int(e["child_idx"]) for e in entries if e.get("is_video")]
-
-
-def _media_summary(row) -> dict:
-    return {
-        "shortcode": row["shortcode"],
-        "kind": row["kind"],
-        "taken_at": row["taken_at"],
-        "caption": row["caption"],
-        "is_video": bool(row["is_video"]),
-        "video_children": _video_children(row),
-        "child_count": row["child_count"],
-        "like_count": row["like_count"],
-        "comments_count": row["comments_count"],
-        "view_count": row["view_count"],
-        "full_status": row["full_status"],
-        "full_error": row["full_error"],
-        "thumb_url": f"/api/media/{row['shortcode']}/thumb",
-        "ig_url": row["ig_url"],
-    }
 
 
 @router.get("/profiles")
@@ -162,7 +128,7 @@ def list_media(
         (username, limit, offset),
     ).fetchall()
     return {
-        "items": [_media_summary(r) for r in rows],
+        "items": [media_summary(r) for r in rows],
         "total": total,
         "exhausted": profile["next_cursor"] == "",
     }
