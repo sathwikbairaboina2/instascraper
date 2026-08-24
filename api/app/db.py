@@ -29,11 +29,20 @@ def new_conn(settings: Settings) -> sqlite3.Connection:
 
 
 def get_conn(settings: Settings) -> sqlite3.Connection:
-    """Long-lived connection cached per thread. Used by the worker thread."""
+    """Long-lived connection cached per thread. Used by the worker thread.
+
+    Keyed by path: the adapter toggle changes db_path at runtime, and a
+    cache that ignored it would keep the worker writing to the database it
+    started with, silently.
+    """
     conn = getattr(_local, "conn", None)
-    if conn is None:
-        conn = _connect(settings.db_path)
-        _local.conn = conn
+    if conn is not None:
+        if getattr(_local, "conn_path", None) == settings.db_path:
+            return conn
+        conn.close()
+    conn = _connect(settings.db_path)
+    _local.conn = conn
+    _local.conn_path = settings.db_path
     return conn
 
 
@@ -41,6 +50,7 @@ def reset_thread_state() -> None:
     """Test helper: forget this thread's cached connection."""
     if getattr(_local, "conn", None) is not None:
         _local.conn = None
+    _local.conn_path = None
 
 
 def init_schema(conn: sqlite3.Connection) -> None:

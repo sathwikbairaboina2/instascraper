@@ -8,6 +8,8 @@ on different AnyIO threadpool threads, which is exactly that situation.
 import sqlite3
 from concurrent.futures import ThreadPoolExecutor
 
+import pytest
+
 from app import db
 
 
@@ -56,3 +58,27 @@ def test_writes_on_a_request_connection_are_visible_to_others(settings, conn):
         ).fetchone()["c"] == 1
     finally:
         request_conn.close()
+
+
+def test_get_conn_follows_a_changed_db_path(settings, tmp_path):
+    """The worker thread must not keep writing to the old database."""
+    from dataclasses import replace
+
+    first = db.get_conn(settings)
+    db.init_schema(first)
+
+    other = replace(settings, db_path=tmp_path / "other" / "app.db")
+    second = db.get_conn(other)
+
+    assert second is not first
+    # The superseded connection is closed, not leaked.
+    with pytest.raises(sqlite3.ProgrammingError):
+        first.execute("SELECT 1")
+
+    db.reset_thread_state()
+
+
+def test_get_conn_reuses_the_connection_for_the_same_path(settings):
+    first = db.get_conn(settings)
+    assert db.get_conn(settings) is first
+    db.reset_thread_state()
