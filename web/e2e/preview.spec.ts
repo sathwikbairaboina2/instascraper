@@ -78,3 +78,33 @@ test('escape closes the lightbox', async ({ page }) => {
   await page.keyboard.press('Escape')
   await expect(page.getByTestId('lightbox')).toHaveCount(0)
 })
+
+test('the lightbox swaps to full quality once the fetch lands', async ({ page }) => {
+  // The React layer is what is under test, so the media list is stubbed:
+  // "none" until the ensure call is seen, "ready" on every poll after it.
+  let fetched = false
+  await page.route('**/api/media/ensure', async (route) => {
+    fetched = true
+    await route.fulfill({ json: { statuses: { 'nike-0': 'ready' }, errors: {}, ready: 1, total: 1 } })
+  })
+  await page.route('**/api/profiles/nike/media**', async (route) => {
+    const res = await route.fetch()
+    const body = await res.json()
+    body.items = body.items.map((i: Record<string, unknown>) =>
+      i.shortcode === 'nike-0' ? { ...i, full_status: fetched ? 'ready' : 'none' } : i,
+    )
+    await route.fulfill({ response: res, json: body })
+  })
+
+  await page.goto('/p/nike')
+  await page.getByTestId('preview-nike-0').click()
+  await expect(page.getByTestId('lightbox-fetch')).toBeVisible()
+
+  await page.getByTestId('lightbox-fetch').click()
+
+  await expect(page.getByTestId('lightbox-image')).toBeVisible()
+  await expect(page.getByTestId('lightbox-image')).toHaveAttribute(
+    'src',
+    /\/api\/media\/nike-0\/full\?child=0/,
+  )
+})
