@@ -52,8 +52,13 @@ mkdir -p .e2e/data .e2e/downloads
 
 (cd web && API_ORIGIN=http://127.0.0.1:8000 npx next dev -H 127.0.0.1 -p 3000) &
 
+# The sleep is load-bearing. Without it this loop spins sixty times in a few
+# milliseconds against a port nothing is listening on yet, gives up, and
+# hands Playwright a dev server that is still compiling -- which surfaces as
+# whichever specs happen to run first failing with ERR_CONNECTION_REFUSED.
 for _ in $(seq 1 60); do
   if curl -sf http://127.0.0.1:3000/api/status >/dev/null 2>&1; then break; fi
+  sleep 1
 done
 
 cd web && npx playwright test "$@"

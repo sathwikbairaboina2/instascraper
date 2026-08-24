@@ -29,11 +29,13 @@ test('cached-only keeps exactly the downloaded items', async ({ page }) => {
   await page.route('**/api/profiles/nike/media**', async (route) => {
     const res = await route.fetch()
     const body = await res.json()
-    // The three oldest are photos. Marking the newest three would mark the
-    // two reels, which the POSTS tab excludes anyway.
-    body.items = body.items.map((i: Record<string, unknown>, idx: number) => ({
+    // Named, not positional. Which end of the list holds photos depends on
+    // the seeded dates, and marking by position quietly started marking
+    // reels -- which the POSTS tab excludes -- when those dates changed.
+    const cached = new Set(['nike-0', 'nike-1', 'nike-2'])
+    body.items = body.items.map((i: Record<string, unknown>) => ({
       ...i,
-      full_status: idx >= body.items.length - 3 ? 'ready' : 'none',
+      full_status: cached.has(i.shortcode as string) ? 'ready' : 'none',
     }))
     await route.fulfill({ response: res, json: body })
   })

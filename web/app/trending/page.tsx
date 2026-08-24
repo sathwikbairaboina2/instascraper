@@ -106,7 +106,15 @@ function TagPosts({ tag, window }: { tag: string; window: TrendWindow }) {
             {marked.has(p.shortcode) && (
               <span
                 data-testid={`trending-marked-${p.shortcode}`}
-                style={{ display: 'block', fontSize: 10, color: tokens.textSecondary }}
+                style={{
+                  display: 'block',
+                  fontSize: 10,
+                  // The button zeroes its line-height so the thumbnail has no
+                  // gap under it. Inherited here that collapses this label to
+                  // nothing: rendered, occupying no space, invisible.
+                  lineHeight: '14px',
+                  color: tokens.textSecondary,
+                }}
               >
                 queued
               </span>

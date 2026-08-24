@@ -146,5 +146,7 @@ test('the preview shows the caption', async ({ page }) => {
   await page.goto('/p/nike')
   await page.getByTestId('preview-nike-3').click()
 
-  await expect(page.getByTestId('lightbox-caption')).toHaveText('caption 3')
+  // Seeded captions carry hashtags now, so the trending feed has something
+  // to rank. Still an exact match -- the whole caption, as stored.
+  await expect(page.getByTestId('lightbox-caption')).toHaveText('caption 3 #running')
 })

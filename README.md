@@ -65,6 +65,18 @@ Keep the tab open while a download runs — the browser drives the flow. If you
 close it, the media that was already fetched stays cached, so re-selecting
 finishes immediately.
 
+**Trending** ranks the hashtags in your cached captions over two windows: the
+last 24 hours and the last 7 days. A tag's score is the likes, comments and
+views of every cached post carrying it, added together, so a tag that several
+decent posts share outranks one that rode a single hit. Expand a row to see
+those posts and send any of them to the recreate queue.
+
+Two things worth knowing before you read the numbers. Views exist on reels
+and nowhere else, so reels weigh more heavily than photos in the total. And
+the day window is only as full as your cache — nothing published in the last
+24 hours has been synced means an empty feed, which the page says outright
+rather than leaving you to guess.
+
 ## When the banner appears
 
 - **Rate limited** — the worker paused itself. Nothing to do; it resumes.
@@ -84,7 +96,7 @@ finishes immediately.
 
 ## Tests
 
-    cd api && python -m pytest        # backend, no network (203 tests)
+    cd api && python -m pytest        # backend, no network
     bash scripts/e2e-native.sh        # full stack on the host, no Docker
     bash scripts/e2e.sh               # same suite via Compose
     cd api && IG_GRAPH_TOKEN=... python -m pytest tests/test_live_canary.py
