@@ -2,6 +2,7 @@ import struct
 import time
 import zlib
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from app import paths
@@ -58,6 +59,9 @@ class FakeAdapter:
     calls: list[CallRecord] = field(default_factory=list)
     _pending: dict[str, Exception] = field(default_factory=dict)
     delay: float = 0.0
+    # One instant per adapter, not per call: a test that reads the same post
+    # twice must see the same date both times.
+    started_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     # ---- test controls -------------------------------------------------
     def add_profile(self, username: str, post_count: int = 0, is_private: bool = False):
@@ -71,22 +75,57 @@ class FakeAdapter:
             avatar_url=f"https://cdn.test/{username}/avatar.jpg",
         )
 
-    def add_posts(self, username: str, count: int, child_count: int = 1, video: bool = False):
+    def add_posts(
+        self,
+        username: str,
+        count: int,
+        child_count: int = 1,
+        video: bool = False,
+        tags: tuple[str, ...] = (),
+        hours_ago: float | None = None,
+        likes: int | None = None,
+        comments: int | None = None,
+        views: int | None = None,
+    ):
+        """Add posts to a profile's bucket.
+
+        `hours_ago` dates the first post relative to this adapter's start and
+        walks an hour further back per post. Left out, posts keep the fixed
+        January dates the older tests were written against.
+        """
         bucket = self.posts.setdefault(username, [])
         start = len(bucket)
         for i in range(start, start + count):
             shortcode = f"{username}-{i}"
             kind = "carousel" if child_count > 1 else ("reel" if video else "image")
+            if hours_ago is None:
+                taken = f"2026-01-{(i % 28) + 1:02d}T00:00:00+00:00"
+            else:
+                taken = (
+                    self.started_at - timedelta(hours=hours_ago + (i - start))
+                ).isoformat()
+            caption = " ".join([f"caption {i}", *(f"#{tag}" for tag in tags)])
             bucket.append(
                 t.IgPost(
                     shortcode=shortcode,
                     kind=kind,
-                    taken_at_iso=f"2026-01-{(i % 28) + 1:02d}T00:00:00+00:00",
-                    caption=f"caption {i}",
+                    taken_at_iso=taken,
+                    caption=caption,
                     is_video=video,
                     child_count=child_count,
                     thumb_url=f"https://cdn.test/{shortcode}/thumb.jpg",
                     ig_url=f"https://instagram.com/p/{shortcode}/",
+                    # Engagement varies per post so a ranking has something to
+                    # order. Views are reels-only, matching Business Discovery:
+                    # a fake that put them on images would let a bug that reads
+                    # views off the wrong post type pass every test.
+                    like_count=likes if likes is not None else 100 + i * 37,
+                    comments_count=comments if comments is not None else 5 + i * 3,
+                    view_count=(
+                        (views if views is not None else 5000 + i * 911)
+                        if video
+                        else None
+                    ),
                 )
             )
 
@@ -188,11 +227,21 @@ def seeded_adapter() -> FakeAdapter:
     so a fake-adapter stack can actually serve the media it seeded. Without a
     single source, the seeded database references posts the running server's
     adapter has never heard of and every media_fetch fails with IgNotFound.
+
+    Dates are relative because the trending feed asks "in the last 24
+    hours", and a dataset pinned to January can only ever answer "nothing".
     """
     adapter = FakeAdapter()
     adapter.add_profile("nike", post_count=8)
-    adapter.add_posts("nike", count=6)
-    adapter.add_posts("nike", count=2, child_count=3)
-    # Two reels: without them the REELS tab has nothing to prove itself on.
-    adapter.add_posts("nike", count=2, video=True)
+    # Today: two tags, overlapping, so the day feed has a ranking to show.
+    adapter.add_posts("nike", count=3, tags=("nike", "justdoit"), hours_ago=2)
+    adapter.add_posts("nike", count=3, tags=("running",), hours_ago=6)
+    # Earlier in the week: present under `week`, absent under `day`, which is
+    # what makes the two windows visibly different.
+    adapter.add_posts(
+        "nike", count=2, child_count=3, tags=("nike", "gear"), hours_ago=72
+    )
+    # Two reels: without them the REELS tab has nothing to prove itself on,
+    # and views never contribute to a score.
+    adapter.add_posts("nike", count=2, video=True, tags=("training",), hours_ago=30)
     return adapter
