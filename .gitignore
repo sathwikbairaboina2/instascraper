@@ -16,3 +16,4 @@ playwright-report/
 api.log
 web.log
 .superpowers/
+web/tsconfig.tsbuildinfo
