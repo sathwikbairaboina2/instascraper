@@ -6,6 +6,7 @@ import {
   ThunderboltOutlined,
   FolderOpenOutlined,
   InboxOutlined,
+  RiseOutlined,
   SearchOutlined,
 } from '@ant-design/icons'
 import {
@@ -173,6 +174,17 @@ export default function AppShell({
           </div>
 
           <div style={{ padding: 10, flex: 'none', borderTop: `1px solid ${token.colorBorderSecondary}` }}>
+            <Link href="/trending">
+              <Button
+                block
+                type="text"
+                data-testid="nav-trending"
+                icon={<RiseOutlined />}
+                style={{ justifyContent: 'flex-start' }}
+              >
+                Trending
+              </Button>
+            </Link>
             <Link href="/recreate">
               <Button
                 block

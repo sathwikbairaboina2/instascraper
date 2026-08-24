@@ -215,3 +215,39 @@ export const prepareRecreate = (shortcode: string, slides: number[] | null) =>
     method: 'POST',
     body: JSON.stringify({ slides }),
   })
+
+export type TrendWindow = 'day' | 'week'
+
+export type TrendingTag = {
+  /** Without the leading '#'. The UI adds it. */
+  tag: string
+  /** likes + comments + views, nulls counted as zero. */
+  score: number
+  like_count: number
+  comments_count: number
+  view_count: number
+  post_count: number
+}
+
+export type TrendingPage = {
+  window: TrendWindow
+  /** The cutoff the server used, so the page can say what it covered. */
+  since: string
+  total: number
+  items: TrendingTag[]
+}
+
+export type TagPostsPage = {
+  tag: string
+  window: TrendWindow
+  total: number
+  items: MediaSummary[]
+}
+
+export const getTrending = (window: TrendWindow, limit = 25, offset = 0) =>
+  call<TrendingPage>(`/api/hashtags/trending?window=${window}&limit=${limit}&offset=${offset}`)
+
+export const getTagPosts = (tag: string, window: TrendWindow, limit = 24, offset = 0) =>
+  call<TagPostsPage>(
+    `/api/hashtags/${encodeURIComponent(tag)}/posts?window=${window}&limit=${limit}&offset=${offset}`,
+  )
