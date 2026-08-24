@@ -73,3 +73,16 @@ CREATE TABLE IF NOT EXISTS quota_events (
 );
 
 CREATE INDEX IF NOT EXISTS quota_events_kind_at ON quota_events(kind, at);
+
+CREATE TABLE IF NOT EXISTS recreate_items (
+  shortcode   TEXT PRIMARY KEY,
+  username    TEXT NOT NULL,
+  ig_url      TEXT NOT NULL,
+  caption     TEXT,
+  status      TEXT NOT NULL DEFAULT 'selected',
+  error       TEXT,
+  added_at    TEXT NOT NULL,
+  updated_at  TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS recreate_items_added ON recreate_items(added_at DESC);

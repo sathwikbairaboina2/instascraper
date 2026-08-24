@@ -1,5 +1,6 @@
 import { AntdRegistry } from '@ant-design/nextjs-registry'
 
+import { RecreateProvider } from '@/components/RecreateProvider'
 import ThemeProvider from '@/components/ThemeProvider'
 import { sans } from '@/lib/fonts'
 
@@ -12,7 +13,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body className={sans.className}>
         <AntdRegistry>
-          <ThemeProvider>{children}</ThemeProvider>
+          <ThemeProvider>
+            <RecreateProvider>{children}</RecreateProvider>
+          </ThemeProvider>
         </AntdRegistry>
       </body>
     </html>

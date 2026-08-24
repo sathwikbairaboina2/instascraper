@@ -53,6 +53,17 @@ export type MediaSummary = {
   ig_url: string
 }
 
+export type RecreateItem = {
+  shortcode: string
+  username: string
+  ig_url: string
+  caption: string | null
+  status: 'selected' | 'submitted' | 'done' | 'failed'
+  error: string | null
+  added_at: string
+  thumb_url: string
+}
+
 export type MediaPage = { items: MediaSummary[]; total: number; exhausted: boolean }
 export type EnsureResult = {
   statuses: Record<string, string>
@@ -135,4 +146,17 @@ export const setAdapter = (adapter: 'graph' | 'fake') =>
   call<{ adapter: 'graph' | 'fake' }>('/api/adapter', {
     method: 'POST',
     body: JSON.stringify({ adapter }),
+  })
+
+export const listRecreate = () => call<{ items: RecreateItem[] }>('/api/recreate')
+export const getRecreateItem = (shortcode: string) =>
+  call<RecreateItem>(`/api/recreate/${encodeURIComponent(shortcode)}`)
+export const markRecreate = (shortcodes: string[]) =>
+  call<{ added: number; unknown: string[] }>('/api/recreate', {
+    method: 'POST',
+    body: JSON.stringify({ shortcodes }),
+  })
+export const unmarkRecreate = (shortcode: string) =>
+  call<{ removed: number }>(`/api/recreate/${encodeURIComponent(shortcode)}`, {
+    method: 'DELETE',
   })

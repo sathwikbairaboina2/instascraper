@@ -1,10 +1,11 @@
 'use client'
 
-import { CheckCircleFilled, ExpandOutlined, ReloadOutlined } from '@ant-design/icons'
+import { CheckCircleFilled, ExpandOutlined, ReloadOutlined, ThunderboltOutlined } from '@ant-design/icons'
 import { Button, Checkbox, Flex, Progress, Space, Tooltip, Typography, theme } from 'antd'
 import { useState } from 'react'
 
 import type { MediaSummary } from '@/lib/api'
+import { GRADIENT_LINEAR } from '@/lib/themes'
 
 const { Text } = Typography
 
@@ -31,12 +32,16 @@ export default function MediaTile({
   onToggle,
   onRetry,
   onPreview,
+  marked = false,
+  onRecreate,
 }: {
   item: MediaSummary
   selected: boolean
   onToggle: (shiftKey: boolean) => void
   onRetry: () => void
   onPreview: () => void
+  marked?: boolean
+  onRecreate?: () => void
 }) {
   const { token } = theme.useToken()
   const [hover, setHover] = useState(false)
@@ -118,6 +123,22 @@ export default function MediaTile({
           />
         )}
 
+        {marked && (
+          <div
+            data-testid={`recreate-flag-${item.shortcode}`}
+            aria-hidden
+            style={{
+              position: 'absolute',
+              right: 0,
+              bottom: 0,
+              width: 0,
+              height: 0,
+              borderBottom: `26px solid transparent`,
+              borderRight: `26px solid #fd1d1d`,
+            }}
+          />
+        )}
+
         {busy && (
           <div style={{ position: 'absolute', left: 9, right: 9, bottom: 8 }}>
             <Text style={{ fontSize: 10.5, color: '#eef2f8', display: 'block', marginBottom: 3 }}>
@@ -162,6 +183,34 @@ export default function MediaTile({
           }}
         />
       </Tooltip>
+
+      {/* Marking is a button; being marked is the ribbon. Same reason the
+          preview control is always rendered rather than hover gated: a
+          control that exists only on hover cannot be reached by keyboard or
+          touch. */}
+      {onRecreate && (
+        <Tooltip title={marked ? 'Remove from Recreate' : 'Send to Recreate'}>
+          <Button
+            size="small"
+            type="text"
+            shape="circle"
+            data-testid={`recreate-${item.shortcode}`}
+            aria-label={`${marked ? 'Remove' : 'Send'} ${item.shortcode} ${marked ? 'from' : 'to'} Recreate`}
+            aria-pressed={marked}
+            icon={<ThunderboltOutlined />}
+            onClick={onRecreate}
+            style={{
+              position: 'absolute',
+              top: 8,
+              right: 40,
+              color: '#fff',
+              background: marked ? GRADIENT_LINEAR : 'rgba(6,8,12,.55)',
+              opacity: show || marked ? 1 : 0.5,
+              transition: 'opacity .15s ease',
+            }}
+          />
+        </Tooltip>
+      )}
 
       {item.full_status === 'failed' && (
         <Flex

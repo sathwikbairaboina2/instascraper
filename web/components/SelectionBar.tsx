@@ -1,6 +1,6 @@
 'use client'
 
-import { CloudDownloadOutlined, ReloadOutlined } from '@ant-design/icons'
+import { CloudDownloadOutlined, ThunderboltOutlined, ReloadOutlined } from '@ant-design/icons'
 import { Alert, Button, Input, Progress, Typography } from 'antd'
 import { useEffect, useRef, useState } from 'react'
 
@@ -19,6 +19,8 @@ export default function SelectionBar({
   fileCount,
   onClear,
   onDone,
+  onRecreate,
+  markedCount = 0,
 }: {
   shortcodes: string[]
   base: string
@@ -26,6 +28,8 @@ export default function SelectionBar({
   fileCount: number
   onClear: () => void
   onDone: () => void
+  onRecreate?: () => Promise<void> | void
+  markedCount?: number
 }) {
   const [phase, setPhase] = useState<Phase>('idle')
   const [progress, setProgress] = useState<EnsureResult | null>(null)
@@ -136,6 +140,20 @@ export default function SelectionBar({
         placeholder="nike_ss26"
         disabled={running}
       />
+      {onRecreate && (
+        <Button
+          block
+          data-testid="send-to-recreate"
+          icon={<ThunderboltOutlined />}
+          onClick={() => void onRecreate()}
+          style={{ marginBottom: 8 }}
+        >
+          {markedCount === shortcodes.length && shortcodes.length > 0
+            ? 'All in Recreate'
+            : `Send ${shortcodes.length} to Recreate`}
+        </Button>
+      )}
+
       {base.trim() && (
         <Text type="secondary" style={{ fontSize: 11, display: 'block', marginTop: 7 }}>
           {base.trim()}_01 through {base.trim()}_{String(fileCount).padStart(2, '0')}

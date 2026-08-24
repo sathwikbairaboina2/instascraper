@@ -66,6 +66,7 @@ import {
   type KindFilter,
 } from '@/lib/useFilters'
 import { usePolling } from '@/lib/usePolling'
+import { useRecreateShared } from '@/components/RecreateProvider'
 import { useSelection } from '@/lib/useSelection'
 
 const { Content, Sider } = Layout
@@ -114,6 +115,8 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
     () => getMedia(username, windowSize, 0),
     4000,
   )
+
+  const recreate = useRecreateShared()
 
   useEffect(() => setSaved(loadSelections(username)), [username])
 
@@ -416,6 +419,8 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
                 <div key={item.shortcode} style={idx === 0 ? { gridColumn: 'span 2', gridRow: 'span 2' } : undefined}>
                   <MediaTile
                     item={item}
+                    marked={recreate.marked.has(item.shortcode)}
+                    onRecreate={() => void recreate.toggle(item.shortcode)}
                     selected={selection.isSelected(item.shortcode)}
                     onToggle={(shift) => selection.toggle(item.shortcode, shift)}
                     onRetry={() => onRetry(item.shortcode)}
@@ -502,6 +507,8 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
                 fileCount={fileCount}
                 onClear={selection.clear}
                 onDone={refreshMedia}
+                onRecreate={() => recreate.mark(selection.selected)}
+                markedCount={selection.selected.filter((sc) => recreate.marked.has(sc)).length}
               />
 
               {pending > 0 && (

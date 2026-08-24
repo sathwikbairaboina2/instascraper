@@ -3,6 +3,7 @@
 import {
   BulbOutlined,
   FieldTimeOutlined,
+  ThunderboltOutlined,
   FolderOpenOutlined,
   InboxOutlined,
   SearchOutlined,
@@ -30,6 +31,7 @@ import { useState } from 'react'
 import { clearBreaker, getProfiles, getStatus, setAdapter } from '@/lib/api'
 import { GRADIENT, GRADIENT_LINEAR } from '@/lib/themes'
 import { useLookup } from '@/lib/useLookup'
+import { useRecreateShared } from './RecreateProvider'
 import { usePolling } from '@/lib/usePolling'
 import ReelLimits from './ReelLimits'
 import UsageMeter from './UsageMeter'
@@ -52,6 +54,7 @@ export default function AppShell({
   const onHome = usePathname() === '/'
   const { value: lookup, setValue: setLookup, submit: submitLookup } = useLookup()
 
+
   const switchAdapter = (next: string) => {
     if (next === status?.adapter) return
     Modal.confirm({
@@ -73,6 +76,7 @@ export default function AppShell({
   const { data: profiles } = usePolling(getProfiles, 30000)
   const { data: status, refresh: refreshStatus } = usePolling(getStatus, 5000)
 
+  const { items: recreateItems } = useRecreateShared()
   const breaker = status?.breaker
   const items = profiles?.items ?? []
 
@@ -169,6 +173,22 @@ export default function AppShell({
           </div>
 
           <div style={{ padding: 10, flex: 'none', borderTop: `1px solid ${token.colorBorderSecondary}` }}>
+            <Link href="/recreate">
+              <Button
+                block
+                type="text"
+                data-testid="nav-recreate"
+                icon={<ThunderboltOutlined />}
+                style={{ justifyContent: 'flex-start' }}
+              >
+                Recreate
+                {recreateItems.length > 0 && (
+                  <Text type="secondary" style={{ fontSize: 11, marginLeft: 'auto' }}>
+                    {recreateItems.length}
+                  </Text>
+                )}
+              </Button>
+            </Link>
             <Link href="/activity">
               <Button block type="text" icon={<FieldTimeOutlined />} style={{ justifyContent: 'flex-start' }}>
                 Activity

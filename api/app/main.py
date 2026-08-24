@@ -12,6 +12,7 @@ from app.routes import downloads as download_routes
 from app.routes import health as health_routes
 from app.routes import media as media_routes
 from app.routes import profiles as profile_routes
+from app.routes import recreate as recreate_routes
 from app.routes import status as status_routes
 from app.worker.breaker import Breaker
 from app.worker.handlers import HANDLERS
@@ -66,6 +67,7 @@ def create_app(
     app.state.worker = None
 
     app.include_router(status_routes.router, prefix="/api")
+    app.include_router(recreate_routes.router, prefix="/api")
     app.include_router(activity_routes.router, prefix="/api")
     app.include_router(profile_routes.router, prefix="/api")
     app.include_router(media_routes.router, prefix="/api")
