@@ -160,3 +160,39 @@ def test_first_page_is_small_and_load_more_takes_a_full_page(ctx, settings):
     handlers.handle_page_fetch(ctx, {"username": "nike"})
     second = ctx.conn.execute("SELECT COUNT(*) c FROM media_items").fetchone()["c"]
     assert second == settings.first_page_size + settings.page_size
+
+
+def test_page_fetch_persists_media_sources(ctx):
+    """The adapter cannot look a post up later, so the urls are stored now."""
+    import json
+
+    ctx.adapter.add_profile("nike", post_count=1)
+    ctx.adapter.posts["nike"] = [
+        t.IgPost(
+            shortcode="s1",
+            kind="image",
+            taken_at_iso="2026-01-01T00:00:00+00:00",
+            caption="",
+            is_video=False,
+            child_count=1,
+            thumb_url="https://cdn.test/t.jpg",
+            ig_url="https://instagram.com/p/s1/",
+            sources=(t.MediaSource(0, "https://cdn.test/full.jpg", "image/jpeg", False),),
+        )
+    ]
+    handlers.handle_profile_sync(ctx, {"username": "nike"})
+    handlers.handle_page_fetch(ctx, {"username": "nike"})
+
+    row = ctx.conn.execute(
+        "SELECT src_urls, src_urls_at FROM media_items WHERE shortcode='s1'"
+    ).fetchone()
+    stored = json.loads(row["src_urls"])
+    assert stored == [
+        {
+            "child_idx": 0,
+            "url": "https://cdn.test/full.jpg",
+            "mime": "image/jpeg",
+            "is_video": False,
+        }
+    ]
+    assert row["src_urls_at"]

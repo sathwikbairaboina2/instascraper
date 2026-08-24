@@ -1,3 +1,5 @@
+import json
+
 from app import paths
 from app.clock import now_iso
 from app.ig import types as t
@@ -68,12 +70,26 @@ def handle_page_fetch(ctx: HandlerContext, payload: dict) -> None:
     page = ctx.adapter.fetch_page(username, cursor, limit)
 
     for post in page.posts:
+        # Business Discovery has no per-media endpoint, so the urls in this
+        # listing are the only ones we will ever be handed. Keep them.
+        sources_json = json.dumps(
+            [
+                {
+                    "child_idx": s.child_idx,
+                    "url": s.url,
+                    "mime": s.mime,
+                    "is_video": s.is_video,
+                }
+                for s in post.sources
+            ]
+        )
         ctx.conn.execute(
             "INSERT INTO media_items (shortcode, username, kind, taken_at, caption,"
-            " is_video, child_count, ig_url, discovered_at)"
-            " VALUES (?,?,?,?,?,?,?,?,?)"
+            " is_video, child_count, ig_url, discovered_at, src_urls, src_urls_at)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?,?)"
             " ON CONFLICT(shortcode) DO UPDATE SET"
-            " caption=excluded.caption, child_count=excluded.child_count",
+            " caption=excluded.caption, child_count=excluded.child_count,"
+            " src_urls=excluded.src_urls, src_urls_at=excluded.src_urls_at",
             (
                 post.shortcode,
                 username,
@@ -83,6 +99,8 @@ def handle_page_fetch(ctx: HandlerContext, payload: dict) -> None:
                 int(post.is_video),
                 post.child_count,
                 post.ig_url,
+                now_iso(),
+                sources_json,
                 now_iso(),
             ),
         )
@@ -128,9 +146,26 @@ def handle_media_fetch(ctx: HandlerContext, payload: dict) -> None:
     )
 
     dest_dir = paths.item_dir(ctx.settings.media_dir, item["username"], shortcode)
+    # The adapter has no database access, so anything it cannot look up for
+    # itself -- which profile owns this post, and the urls we last saw --
+    # has to travel with the call.
+    sources = tuple(
+        t.MediaSource(
+            child_idx=int(entry["child_idx"]),
+            url=entry["url"],
+            mime=entry["mime"],
+            is_video=bool(entry["is_video"]),
+        )
+        for entry in json.loads(item["src_urls"] or "[]")
+    )
+    hint = t.MediaHint(
+        username=item["username"],
+        sources=sources,
+        captured_at=item["src_urls_at"] or "",
+    )
     try:
         ctx.pacer.wait()
-        saved_files = ctx.adapter.fetch_media(shortcode, dest_dir)
+        saved_files = ctx.adapter.fetch_media(shortcode, dest_dir, hint)
     except t.IgError as exc:
         ctx.conn.execute(
             "UPDATE media_items SET full_status='failed', full_error=? WHERE shortcode=?",

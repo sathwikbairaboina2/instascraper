@@ -86,3 +86,76 @@ def test_handlers_registry_covers_every_job_kind():
     from app.worker import queue
 
     assert set(handlers.HANDLERS) == set(queue.PRIORITY)
+
+
+class Recording:
+    """Captures the hint the handler passes, and writes nothing."""
+
+    def __init__(self):
+        self.hint = "unset"
+
+    def fetch_media(self, shortcode, dest_dir, hint=None):
+        self.hint = hint
+        return []
+
+
+def recording_ctx(settings, conn, adapter):
+    return HandlerContext(
+        conn=conn,
+        adapter=adapter,
+        settings=settings,
+        pacer=Pacer(min_interval=0.0),
+        enqueue=lambda kind, payload: None,
+    )
+
+
+def test_media_fetch_hands_the_adapter_a_hint(settings, conn):
+    import json
+
+    conn.execute(
+        "INSERT INTO profiles (username, created_at) VALUES ('nike','2026-01-01T00:00:00+00:00')"
+    )
+    conn.execute(
+        "INSERT INTO media_items (shortcode, username, kind, taken_at, is_video,"
+        " ig_url, discovered_at, src_urls, src_urls_at)"
+        " VALUES ('s1','nike','image','2026-01-01T00:00:00+00:00',0,"
+        " 'https://instagram.com/p/s1/','2026-01-01T00:00:00+00:00',?,?)",
+        (
+            json.dumps(
+                [
+                    {
+                        "child_idx": 0,
+                        "url": "https://cdn/f.jpg",
+                        "mime": "image/jpeg",
+                        "is_video": False,
+                    }
+                ]
+            ),
+            "2026-01-01T00:00:00+00:00",
+        ),
+    )
+
+    adapter = Recording()
+    handlers.handle_media_fetch(recording_ctx(settings, conn, adapter), {"shortcode": "s1"})
+
+    assert adapter.hint.username == "nike"
+    assert adapter.hint.sources == (
+        t.MediaSource(0, "https://cdn/f.jpg", "image/jpeg", False),
+    )
+
+
+def test_media_fetch_hint_is_empty_when_nothing_was_stored(settings, conn):
+    conn.execute(
+        "INSERT INTO profiles (username, created_at) VALUES ('nike','2026-01-01T00:00:00+00:00')"
+    )
+    conn.execute(
+        "INSERT INTO media_items (shortcode, username, kind, taken_at, is_video,"
+        " ig_url, discovered_at) VALUES ('s2','nike','image','2026-01-01T00:00:00+00:00',0,"
+        " 'https://instagram.com/p/s2/','2026-01-01T00:00:00+00:00')"
+    )
+
+    adapter = Recording()
+    handlers.handle_media_fetch(recording_ctx(settings, conn, adapter), {"shortcode": "s2"})
+
+    assert adapter.hint.sources == ()
+    assert adapter.hint.username == "nike"
