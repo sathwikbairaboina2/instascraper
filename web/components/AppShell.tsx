@@ -18,6 +18,7 @@ import {
   Input,
   Layout,
   List,
+  Modal,
   Segmented,
   Space,
   Typography,
@@ -27,7 +28,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 
-import { clearBreaker, getProfiles, getStatus, syncProfile } from '@/lib/api'
+import { clearBreaker, getProfiles, getStatus, setAdapter, syncProfile } from '@/lib/api'
 import { THEMES } from '@/lib/themes'
 import { usePolling } from '@/lib/usePolling'
 import { useThemePref } from './ThemeProvider'
@@ -46,6 +47,23 @@ export default function AppShell({
   const { themed, dark, setThemeName, setDark } = useThemePref()
   const router = useRouter()
   const [lookup, setLookup] = useState('')
+
+  const switchAdapter = (next: string) => {
+    if (next === status?.adapter) return
+    Modal.confirm({
+      title: next === 'fake' ? 'Switch to fake data?' : 'Switch to Graph data?',
+      content:
+        'The app will reload and show the other dataset. Nothing is deleted — ' +
+        'the dataset you are leaving is kept exactly as it is.',
+      okText: 'Switch',
+      onOk: async () => {
+        await setAdapter(next as 'graph' | 'fake')
+        // Everything on screen came from a database that is no longer live,
+        // and the profile being viewed may not exist in the other dataset.
+        window.location.assign('/')
+      },
+    })
+  }
   const [queueOpen, setQueueOpen] = useState(false)
 
   const { data: profiles } = usePolling(getProfiles, 30000)
@@ -168,6 +186,21 @@ export default function AppShell({
                 </Flex>
               ),
             }))}
+          />
+          <Text
+            type="secondary"
+            style={{ fontSize: 11, letterSpacing: '.06em', marginLeft: 16 }}
+          >
+            DATA
+          </Text>
+          <Segmented
+            size="small"
+            value={status?.adapter ?? 'graph'}
+            onChange={(v) => switchAdapter(v as string)}
+            options={[
+              { value: 'graph', label: 'Graph' },
+              { value: 'fake', label: 'Fake' },
+            ]}
           />
           <div style={{ flex: 1 }} />
           <Badge status={status?.worker === 'running' ? 'processing' : 'default'} />

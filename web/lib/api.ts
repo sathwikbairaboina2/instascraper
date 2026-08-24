@@ -1,5 +1,6 @@
 export type StatusBody = {
   worker: 'running' | 'stopped'
+  adapter: 'graph' | 'fake'
   token_configured: boolean
   breaker: {
     tripped: boolean
@@ -116,3 +117,9 @@ export const createDownload = (shortcodes: string[], base: string) =>
 
 export const getActivity = (limit = 100) =>
   call<{ items: ActivityItem[] }>(`/api/activity?limit=${limit}`)
+
+export const setAdapter = (adapter: 'graph' | 'fake') =>
+  call<{ adapter: 'graph' | 'fake' }>('/api/adapter', {
+    method: 'POST',
+    body: JSON.stringify({ adapter }),
+  })
