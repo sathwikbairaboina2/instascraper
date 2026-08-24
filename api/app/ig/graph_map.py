@@ -89,7 +89,9 @@ def post_from_node(node: dict) -> t.IgPost:
     permalink = node.get("permalink") or ""
     media_type = node.get("media_type", "")
     kind = _KIND.get(media_type, "image")
-    if kind == "video" and "/reel/" in permalink:
+    # Meta labels the surface a post was published to. A reel can carry a
+    # /p/ permalink, so the url shape is only ever a guess at this.
+    if kind == "video" and node.get("media_product_type") == "REELS":
         kind = "reel"
     children = _children(node)
     return t.IgPost(

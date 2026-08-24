@@ -104,3 +104,40 @@ def test_absent_media_edge_is_an_empty_exhausted_page():
     page = graph_map.page_from_payload({"business_discovery": {"username": "x"}})
     assert page.posts == []
     assert page.next_cursor is None
+
+
+def test_reel_is_classified_from_the_product_type_not_the_url():
+    """The permalink shape is a proxy; media_product_type is the definition."""
+    node = {
+        "media_type": "VIDEO",
+        "media_product_type": "REELS",
+        "media_url": "https://cdn/v.mp4",
+        "thumbnail_url": "https://cdn/t.jpg",
+        # A /p/ permalink on a reel: the old heuristic would miss this.
+        "permalink": "https://www.instagram.com/p/AAAAAAAAAAA/",
+        "timestamp": "2026-08-20T14:03:11+0000",
+    }
+    assert graph_map.post_from_node(node).kind == "reel"
+
+
+def test_feed_video_is_not_a_reel():
+    node = {
+        "media_type": "VIDEO",
+        "media_product_type": "FEED",
+        "media_url": "https://cdn/v.mp4",
+        "thumbnail_url": "https://cdn/t.jpg",
+        "permalink": "https://www.instagram.com/reel/AAAAAAAAAAA/",
+        "timestamp": "2026-08-20T14:03:11+0000",
+    }
+    assert graph_map.post_from_node(node).kind == "video"
+
+
+def test_a_missing_product_type_falls_back_to_the_media_type():
+    """Older recorded payloads carry no product type; they must still map."""
+    node = {
+        "media_type": "IMAGE",
+        "media_url": "https://cdn/i.jpg",
+        "permalink": "https://www.instagram.com/p/AAAAAAAAAAA/",
+        "timestamp": "2026-08-20T14:03:11+0000",
+    }
+    assert graph_map.post_from_node(node).kind == "image"

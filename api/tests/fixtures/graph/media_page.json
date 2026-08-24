@@ -8,7 +8,8 @@
           "media_type": "IMAGE",
           "media_url": "https://scontent.cdninstagram.com/img1.jpg",
           "permalink": "https://www.instagram.com/p/AAAAAAAAAAA/",
-          "timestamp": "2026-08-20T14:03:11+0000"
+          "timestamp": "2026-08-20T14:03:11+0000",
+          "media_product_type": "FEED"
         },
         {
           "id": "2",
@@ -41,7 +42,8 @@
                 "thumbnail_url": "https://scontent.cdninstagram.com/c2.jpg"
               }
             ]
-          }
+          },
+          "media_product_type": "FEED"
         }
       ],
       "paging": {
