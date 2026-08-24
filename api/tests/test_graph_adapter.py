@@ -379,3 +379,52 @@ def test_a_reel_reports_that_meta_publishes_no_file_for_it(graph_settings, tmp_p
         adapter.fetch_media("REELCODE123", tmp_path, hint)
 
     assert "reel" in str(caught.value).lower()
+
+
+def test_a_source_with_no_url_never_reaches_the_fetcher(graph_settings, tmp_path):
+    """Rows indexed before reels were understood still carry an empty url.
+
+    The hint comes from our database, not from Meta. Handed on, httpx calls
+    the empty string a malformed request and the adapter wraps that as
+    transient -- so the job retries three times before failing with a
+    message about a protocol prefix.
+    """
+    reel_page = {
+        "business_discovery": {
+            "media": {
+                "data": [
+                    {
+                        "id": "1",
+                        "media_type": "VIDEO",
+                        "media_product_type": "REELS",
+                        "thumbnail_url": "https://cdn/t.jpg",
+                        "permalink": "https://www.instagram.com/reel/REELCODE123/",
+                        "timestamp": "2026-08-20T14:03:11+0000",
+                    }
+                ],
+                "paging": {"cursors": {"after": "C1"}},
+            }
+        },
+        "id": "SELF",
+    }
+
+    asked: list[str] = []
+
+    def fetcher(url: str):
+        asked.append(url)
+        return 200, b"DATA"
+
+    stale = t.MediaHint(
+        username="nike",
+        sources=(t.MediaSource(child_idx=0, url="", mime="video/mp4", is_video=True),),
+        captured_at="",
+    )
+    adapter = GraphAdapter(
+        graph_settings, transport=Transport((200, {}, reel_page)), fetcher=fetcher
+    )
+
+    with pytest.raises(t.IgNotFound) as caught:
+        adapter.fetch_media("REELCODE123", tmp_path, stale)
+
+    assert asked == [], f"downloaded from a urlless source: {asked}"
+    assert "reel" in str(caught.value).lower()

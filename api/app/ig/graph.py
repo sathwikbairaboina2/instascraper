@@ -194,7 +194,11 @@ class GraphAdapter:
     def fetch_media(
         self, shortcode: str, dest_dir: Path, hint: t.MediaHint | None = None
     ) -> list[t.SavedFile]:
-        sources = tuple(hint.sources) if hint else ()
+        # A stored source with no url is not something to download. Rows
+        # indexed before reels were understood carry one, and httpx reports
+        # the empty string as a malformed request -- which the adapter would
+        # then wrap as transient and retry, three times, pointlessly.
+        sources = tuple(s for s in hint.sources if s.url) if hint else ()
         if not sources:
             sources = self._refresh(shortcode, hint)
         try:
