@@ -48,6 +48,7 @@ def create_app(
                 app.state.runtime,
                 app.state.breaker,
                 app.state.pacer,
+                app.state.cdn_pacer,
                 HANDLERS,
             )
             worker.start()
@@ -61,6 +62,7 @@ def create_app(
     app.state.runtime = holder
     app.state.breaker = Breaker()
     app.state.pacer = Pacer(min_interval=base.ig_min_interval)
+    app.state.cdn_pacer = Pacer(min_interval=base.cdn_min_interval)
     app.state.worker = None
 
     app.include_router(status_routes.router, prefix="/api")

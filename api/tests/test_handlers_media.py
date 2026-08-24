@@ -18,6 +18,7 @@ def ready_ctx(settings, conn):
         adapter=adapter,
         settings=settings,
         pacer=Pacer(min_interval=0.0),
+        cdn_pacer=Pacer(min_interval=0.0),
         enqueue=lambda kind, payload: None,
     )
     handlers.handle_profile_sync(ctx, {"username": "nike"})
@@ -105,6 +106,7 @@ def recording_ctx(settings, conn, adapter):
         adapter=adapter,
         settings=settings,
         pacer=Pacer(min_interval=0.0),
+        cdn_pacer=Pacer(min_interval=0.0),
         enqueue=lambda kind, payload: None,
     )
 

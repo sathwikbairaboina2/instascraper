@@ -21,6 +21,9 @@ class HandlerContext:
     adapter: object
     settings: Settings
     pacer: Pacer
+    # Meta's CDN does not spend the Graph quota, so thumbnails and avatars
+    # wait on their own, far shorter, floor.
+    cdn_pacer: Pacer
     enqueue: Callable[[str, dict], None]
 
 
@@ -37,12 +40,14 @@ class Worker(threading.Thread):
         runtime,
         breaker: Breaker,
         pacer: Pacer,
+        cdn_pacer: Pacer,
         handlers: dict[str, Handler],
     ):
         super().__init__(name="ig-worker", daemon=True)
         self.runtime = runtime
         self.breaker = breaker
         self.pacer = pacer
+        self.cdn_pacer = cdn_pacer
         self.handlers = handlers
         self.wake = threading.Event()
         self.stop_flag = threading.Event()
@@ -96,6 +101,7 @@ class Worker(threading.Thread):
             adapter=current.adapter,
             settings=current.settings,
             pacer=self.pacer,
+            cdn_pacer=self.cdn_pacer,
             enqueue=lambda kind, p: self._enqueue(conn, kind, p),
         )
 

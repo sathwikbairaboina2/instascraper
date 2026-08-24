@@ -20,7 +20,13 @@ def worker_env(settings, conn):
 
 
 def _run(settings, adapter, breaker, pacer, handlers, conn):
-    worker = Worker(RuntimeConfig.fixed(settings, adapter), breaker, pacer, handlers)
+    worker = Worker(
+        RuntimeConfig.fixed(settings, adapter),
+        breaker,
+        pacer,
+        Pacer(min_interval=0.0),
+        handlers,
+    )
     worker.start()
     worker.wake.set()
     worker.drain(timeout=10)
@@ -105,7 +111,11 @@ def test_challenge_trips_breaker_permanently_and_stops_work(worker_env):
     queue.enqueue(conn, "profile_sync", {"username": "adidas"})
 
     worker = Worker(
-        RuntimeConfig.fixed(settings, adapter), breaker, pacer, {"profile_sync": handler}
+        RuntimeConfig.fixed(settings, adapter),
+        breaker,
+        pacer,
+        Pacer(min_interval=0.0),
+        {"profile_sync": handler},
     )
     worker.start()
     worker.wake.set()
@@ -178,7 +188,9 @@ def test_worker_picks_up_a_swapped_adapter_on_the_next_job(worker_env):
         seen.append(ctx.adapter)
 
     queue.enqueue(conn, "profile_sync", {"username": "nike"})
-    worker = Worker(holder, breaker, pacer, {"profile_sync": handler})
+    worker = Worker(
+        holder, breaker, pacer, Pacer(min_interval=0.0), {"profile_sync": handler}
+    )
     worker.start()
     worker.wake.set()
     worker.drain(timeout=2.0)

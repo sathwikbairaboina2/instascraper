@@ -62,7 +62,7 @@ def test_breaker_waits_at_least_as_long_as_meta_asked(settings, conn):
 
     queue.enqueue(conn, "profile_sync", {"username": "nike"})
     worker = Worker(
-        RuntimeConfig.fixed(s, FakeAdapter()), breaker, Pacer(0.0), {"profile_sync": handler}
+        RuntimeConfig.fixed(s, FakeAdapter()), breaker, Pacer(0.0), Pacer(0.0), {"profile_sync": handler}
     )
     worker.start()
     worker.wake.set()
@@ -82,7 +82,7 @@ def test_backoff_floor_still_applies_when_no_wait_is_given(settings, conn):
 
     queue.enqueue(conn, "profile_sync", {"username": "nike"})
     worker = Worker(
-        RuntimeConfig.fixed(s, FakeAdapter()), breaker, Pacer(0.0), {"profile_sync": handler}
+        RuntimeConfig.fixed(s, FakeAdapter()), breaker, Pacer(0.0), Pacer(0.0), {"profile_sync": handler}
     )
     worker.start()
     worker.wake.set()
@@ -111,6 +111,7 @@ def test_a_dead_token_trips_the_breaker_permanently(settings, conn):
     worker = Worker(
         RuntimeConfig.fixed(settings, FakeAdapter()),
         breaker,
+        Pacer(0.0),
         Pacer(0.0),
         {"profile_sync": handler},
     )

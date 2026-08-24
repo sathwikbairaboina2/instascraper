@@ -9,6 +9,16 @@ from app.worker.pacer import Pacer
 from app.worker.runner import HandlerContext
 
 
+class CountingPacer:
+    """A pacer that records rather than sleeps."""
+
+    def __init__(self):
+        self.waits = 0
+
+    def wait(self) -> None:
+        self.waits += 1
+
+
 @pytest.fixture
 def ctx(settings, conn):
     adapter = FakeAdapter()
@@ -17,7 +27,8 @@ def ctx(settings, conn):
         conn=conn,
         adapter=adapter,
         settings=settings,
-        pacer=Pacer(min_interval=0.0),
+        pacer=CountingPacer(),
+        cdn_pacer=CountingPacer(),
         enqueue=lambda kind, payload: enqueued.append((kind, payload)),
     )
     context.enqueued = enqueued  # type: ignore[attr-defined]
@@ -236,3 +247,18 @@ def test_profile_sync_stores_the_follower_count(ctx):
         "SELECT followers_count FROM profiles WHERE username='nike'"
     ).fetchone()
     assert row["followers_count"] == 1234
+
+
+def test_thumbnails_are_paced_separately_from_graph_calls(ctx, settings):
+    """CDN downloads do not spend Meta's quota, so they do not wait like it."""
+    ctx.adapter.add_profile("nike")
+    ctx.adapter.add_posts("nike", count=5)
+    handlers.handle_profile_sync(ctx, {"username": "nike"})
+    graph_before = ctx.pacer.waits
+    cdn_before = ctx.cdn_pacer.waits
+
+    handlers.handle_page_fetch(ctx, {"username": "nike"})
+
+    # One Graph call for the listing, one CDN fetch per thumbnail on it.
+    assert ctx.pacer.waits - graph_before == 1
+    assert ctx.cdn_pacer.waits - cdn_before == settings.first_page_size

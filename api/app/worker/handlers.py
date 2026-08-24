@@ -37,7 +37,7 @@ def handle_profile_sync(ctx: HandlerContext, payload: dict) -> None:
         raise t.IgPrivate(f"{username} is private")
 
     avatar_dest = ctx.settings.media_dir / username / "avatar.jpg"
-    ctx.pacer.wait()
+    ctx.cdn_pacer.wait()
     ctx.adapter.download_to(profile.avatar_url, avatar_dest)
 
     ctx.conn.execute(
@@ -118,7 +118,7 @@ def handle_page_fetch(ctx: HandlerContext, payload: dict) -> None:
 
         thumb_dest = paths.item_dir(ctx.settings.media_dir, username, post.shortcode) / "thumb.jpg"
         if not thumb_dest.exists():
-            ctx.pacer.wait()
+            ctx.cdn_pacer.wait()
             saved = ctx.adapter.download_to(post.thumb_url, thumb_dest)
             ctx.conn.execute(
                 "INSERT INTO media_files (shortcode, role, child_idx, path, mime, bytes,"

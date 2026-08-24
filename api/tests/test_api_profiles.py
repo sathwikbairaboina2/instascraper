@@ -8,7 +8,7 @@ from app.worker.runner import HandlerContext
 def seed(client, conn, settings, adapter, username="nike"):
     ctx = HandlerContext(
         conn=conn, adapter=adapter, settings=settings,
-        pacer=Pacer(0.0), enqueue=lambda *a: None,
+        pacer=Pacer(0.0), cdn_pacer=Pacer(0.0), enqueue=lambda *a: None,
     )
     handlers.handle_profile_sync(ctx, {"username": username})
     handlers.handle_page_fetch(ctx, {"username": username})

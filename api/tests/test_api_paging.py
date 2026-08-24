@@ -12,7 +12,7 @@ from app.worker.runner import HandlerContext
 def _ctx(conn, settings, adapter):
     return HandlerContext(
         conn=conn, adapter=adapter, settings=settings,
-        pacer=Pacer(0.0), enqueue=lambda *a: None,
+        pacer=Pacer(0.0), cdn_pacer=Pacer(0.0), enqueue=lambda *a: None,
     )
 
 

@@ -11,6 +11,7 @@ class Settings:
     page_size: int
     first_page_size: int
     ig_min_interval: float
+    cdn_min_interval: float
     ig_backoff: int
     adapter: str
     graph_token: str
@@ -26,11 +27,15 @@ def load_settings() -> Settings:
         media_dir=Path(os.environ.get("MEDIA_DIR", "/data/media")),
         out_dir=Path(os.environ.get("OUT_DIR_CONTAINER", "/out")),
         page_size=int(os.environ.get("PAGE_SIZE", "36")),
-        # The first page is spent before the user has confirmed the profile is
-        # the right one, and every post on it costs a thumbnail request. Keep
-        # it small; "Load more" is where a full page is asked for.
-        first_page_size=int(os.environ.get("FIRST_PAGE_SIZE", "3")),
+        # A Graph page of 200 costs the same single call as a page of 3, so
+        # this is bounded by thumbnail fetches rather than by quota. Twelve
+        # fills the first screen of the grid.
+        first_page_size=int(os.environ.get("FIRST_PAGE_SIZE", "12")),
         ig_min_interval=float(os.environ.get("IG_MIN_INTERVAL", "3")),
+        # Thumbnails and avatars come from Meta's CDN, which does not spend
+        # the Graph quota. Pacing them is politeness, not rate-limit
+        # avoidance, so the floor is far below the one on api calls.
+        cdn_min_interval=float(os.environ.get("IG_CDN_MIN_INTERVAL", "0.5")),
         ig_backoff=int(os.environ.get("IG_BACKOFF", "900")),
         adapter=os.environ.get("IG_ADAPTER", "graph"),
         graph_token=os.environ.get("IG_GRAPH_TOKEN", ""),

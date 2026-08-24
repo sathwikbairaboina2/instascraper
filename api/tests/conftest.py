@@ -18,6 +18,7 @@ def settings(tmp_path: Path) -> Settings:
         page_size=4,
         first_page_size=2,
         ig_min_interval=0.05,
+        cdn_min_interval=0.0,
         ig_backoff=2,
         adapter="fake",
         graph_token="",
