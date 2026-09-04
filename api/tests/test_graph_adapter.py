@@ -560,3 +560,24 @@ def test_a_reel_that_does_come_with_a_url_uses_it(graph_settings, tmp_path):
     assert reels.calls == []
 
 
+def test_a_refresh_hands_back_every_post_on_the_page(graph_settings, tmp_path):
+    """One page call, urls for the whole page -- keep them all.
+
+    Discarding the rest made the next stale post in the same page pay for the
+    same listing over again.
+    """
+    seen = []
+    fetcher = Fetcher({"https://scontent.cdninstagram.com/img1.jpg": b"REFRESHED"})
+    adapter = GraphAdapter(
+        graph_settings,
+        transport=Transport((200, {}, load("media_page.json"))),
+        fetcher=fetcher,
+        on_refresh=lambda username, posts: seen.append((username, posts)),
+    )
+
+    adapter.fetch_media("AAAAAAAAAAA", tmp_path, hint_for("https://cdn/stale.jpg"))
+
+    assert len(seen) == 1
+    username, posts = seen[0]
+    assert username == "nike"
+    assert len(posts) > 1, "the whole page, not just the post being opened"

@@ -130,12 +130,17 @@ class GraphAdapter:
         transport=None,
         fetcher=None,
         reel_downloader=None,
+        on_refresh=None,
     ):
         self._settings = settings
         self._transport = transport or _httpx_transport
         self._fetcher = fetcher or _httpx_fetcher
         # Present only for the gap Business Discovery leaves: reel video.
         self._reels = reel_downloader
+        # Called with every post a refresh listing returned. Bound by the
+        # factory, because an adapter has no database access of its own -- the
+        # same reason the reel budget is spent through a callback.
+        self._on_refresh = on_refresh
         self._usage = 0.0
         self._usage_peak = 0.0
 
@@ -284,6 +289,12 @@ class GraphAdapter:
         cursor: str | None = None
         for _ in range(max(1, self._settings.graph_refresh_pages)):
             page = self.fetch_page(hint.username, cursor, self._settings.page_size)
+            # A refresh costs a page call and comes back with fresh urls for
+            # every post on that page, not just the one being opened. Throwing
+            # the rest away made the next stale post in the same page pay the
+            # same price over again.
+            if self._on_refresh is not None and page.posts:
+                self._on_refresh(hint.username, page.posts)
             for post in page.posts:
                 if post.shortcode == shortcode:
                     # Found. Empty means Meta published no file for it, which

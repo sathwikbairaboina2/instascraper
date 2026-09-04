@@ -19,8 +19,50 @@ def make_adapter(settings: Settings):
     from app.ig.reels import ReelDownloader
 
     return GraphAdapter(
-        settings, reel_downloader=ReelDownloader(settings, spend=_spend(settings))
+        settings,
+        reel_downloader=ReelDownloader(settings, spend=_spend(settings)),
+        on_refresh=_store_sources(settings),
     )
+
+
+def _store_sources(settings: Settings):
+    """Keep the urls a refresh listing handed us, for every post on the page.
+
+    Bound here for the same reason as the reel budget: the adapter has no
+    database access. Without this, opening one post whose urls had expired
+    spent a page call, used one row's worth of the answer, and discarded the
+    other thirty-five -- so the next post opened from the same page paid again.
+    """
+
+    def store(username: str, posts) -> None:
+        import json
+
+        from app import db
+        from app.clock import now_iso
+
+        conn = db.get_conn(settings)
+        now = now_iso()
+        for post in posts:
+            conn.execute(
+                "UPDATE media_items SET src_urls=?, src_urls_at=? WHERE shortcode=?",
+                (
+                    json.dumps(
+                        [
+                            {
+                                "child_idx": s.child_idx,
+                                "url": s.url,
+                                "mime": s.mime,
+                                "is_video": s.is_video,
+                            }
+                            for s in post.sources
+                        ]
+                    ),
+                    now,
+                    post.shortcode,
+                ),
+            )
+
+    return store
 
 
 def _spend(settings: Settings):
