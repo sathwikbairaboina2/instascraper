@@ -88,6 +88,10 @@ class MediaHint:
     username: str
     sources: tuple[MediaSource, ...]
     captured_at: str
+    # image | video | reel | carousel. The adapter needs it to know when
+    # re-listing a profile cannot possibly help: Business Discovery publishes
+    # no video for a reel, so a refresh spends pages to learn nothing.
+    kind: str = ""
 
 
 @dataclass(frozen=True)

@@ -514,3 +514,49 @@ def test_without_a_downloader_a_reel_still_explains_itself(graph_settings, tmp_p
         adapter.fetch_media("REELCODE123", tmp_path, hint)
 
     assert "reel" in str(caught.value).lower()
+
+
+def test_a_reel_with_no_url_skips_the_pointless_re_listing(graph_settings, tmp_path):
+    """Business Discovery never serves reel video, so a refresh cannot help.
+
+    It used to spend up to graph_refresh_pages page calls -- about a tenth of
+    Meta's hourly allowance per post -- to arrive back at this same fallback.
+    """
+    saved = t.SavedFile(
+        child_idx=0, path=tmp_path / "full.mp4", mime="video/mp4", bytes=7,
+        width=None, height=None,
+    )
+    reels = FakeReels(saved=saved)
+    transport = Transport((200, {}, _reel_page()))
+    adapter = GraphAdapter(
+        graph_settings, transport=transport, fetcher=Fetcher({}), reel_downloader=reels
+    )
+    hint = t.MediaHint(username="nike", sources=(), captured_at="", kind="reel")
+
+    result = adapter.fetch_media("REELCODE123", tmp_path, hint)
+
+    assert result == [saved]
+    assert transport.urls == [], "no Graph call should have been spent"
+
+
+def test_a_reel_that_does_come_with_a_url_uses_it(graph_settings, tmp_path):
+    """The scraping budget is for what the CDN will not serve, nothing else."""
+    reels = FakeReels()
+    adapter = GraphAdapter(
+        graph_settings,
+        transport=Transport(),
+        fetcher=Fetcher({"https://cdn/v.mp4": b"VID"}),
+        reel_downloader=reels,
+        )
+    hint = t.MediaHint(
+        username="nike",
+        sources=(t.MediaSource(0, "https://cdn/v.mp4", "video/mp4", True),),
+        captured_at="",
+        kind="reel",
+    )
+
+    adapter.fetch_media("REELCODE123", tmp_path, hint)
+
+    assert reels.calls == []
+
+

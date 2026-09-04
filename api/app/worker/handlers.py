@@ -240,6 +240,7 @@ def handle_media_fetch(ctx: HandlerContext, payload: dict) -> None:
         username=item["username"],
         sources=sources,
         captured_at=item["src_urls_at"] or "",
+        kind=item["kind"],
     )
     try:
         ctx.pacer.wait()

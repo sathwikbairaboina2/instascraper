@@ -222,6 +222,13 @@ class GraphAdapter:
         # then wrap as transient and retry, three times, pointlessly.
         sources = tuple(s for s in hint.sources if s.url) if hint else ()
 
+        # A reel has no Graph-served video, so re-listing the profile to look
+        # for one spends up to IG_GRAPH_REFRESH_PAGES page calls -- a tenth of
+        # Meta's hourly allowance -- to arrive back at the same fallback. Go
+        # there directly.
+        if self._is_reel_fallback(hint, sources):
+            return [self._reels.download(shortcode, dest_dir / "full.mp4")]
+
         if not sources:
             sources = self._refresh(shortcode, hint)
         if not sources:
@@ -240,7 +247,10 @@ class GraphAdapter:
         except _Stale:
             # Meta's CDN urls expire. Shallow indexing makes a bounded
             # re-listing cheap, so this is recoverable rather than fatal.
-            return self._download_all(self._refresh(shortcode, hint), dest_dir)
+            refreshed = self._refresh(shortcode, hint)
+            if self._is_reel_fallback(hint, refreshed):
+                return [self._reels.download(shortcode, dest_dir / "full.mp4")]
+            return self._download_all(refreshed, dest_dir)
 
     def download_to(self, url: str, dest: Path) -> t.SavedFile:
         try:
@@ -249,6 +259,23 @@ class GraphAdapter:
             raise t.IgTransient(f"could not download {dest.name}") from exc
 
     # ---- internals -----------------------------------------------------
+    def _is_reel_fallback(
+        self, hint: t.MediaHint | None, sources: tuple[t.MediaSource, ...]
+    ) -> bool:
+        """Whether the only way to get this file is instagram.com.
+
+        True for a reel we have no url for and a downloader to fall back on.
+        A reel that *did* come with a url is left alone -- Meta occasionally
+        serves one, and spending the scraping budget on a file the CDN would
+        have handed over is the opposite of the point.
+        """
+        return bool(
+            self._reels is not None
+            and hint is not None
+            and hint.kind == "reel"
+            and not sources
+        )
+
     def _refresh(self, shortcode: str, hint: t.MediaHint | None) -> tuple[t.MediaSource, ...]:
         if hint is None or not hint.username:
             raise t.IgNotFound(
