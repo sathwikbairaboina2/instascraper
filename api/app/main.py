@@ -15,12 +15,17 @@ from app.routes import media as media_routes
 from app.routes import profiles as profile_routes
 from app.routes import recreate as recreate_routes
 from app.routes import status as status_routes
+from app.routes import urls as url_routes
 from app.worker.breaker import Breaker
 from app.worker.handlers import HANDLERS
 from app.worker.pacer import Pacer
 from app.worker.runner import Worker
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
+# httpx logs every request line at INFO, which for us means every media url
+# including its signed `oh=`/`oe=` parameters. Those are credentials with an
+# expiry, and they bury the one line per job this app actually emits.
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
 def create_app(
@@ -75,6 +80,7 @@ def create_app(
     app.include_router(download_routes.router, prefix="/api")
     app.include_router(hashtag_routes.router, prefix="/api")
     app.include_router(health_routes.router, prefix="/api")
+    app.include_router(url_routes.router, prefix="/api")
     return app
 
 

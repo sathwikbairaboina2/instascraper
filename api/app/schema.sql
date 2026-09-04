@@ -92,3 +92,11 @@ CREATE TABLE IF NOT EXISTS recreate_items (
 );
 
 CREATE INDEX IF NOT EXISTS recreate_items_added ON recreate_items(added_at DESC);
+
+CREATE TABLE IF NOT EXISTS direct_urls (
+  shortcode TEXT PRIMARY KEY,
+  url       TEXT NOT NULL,
+  added_at  TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS direct_urls_added ON direct_urls(added_at DESC);

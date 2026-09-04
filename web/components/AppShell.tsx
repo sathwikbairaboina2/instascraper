@@ -3,6 +3,7 @@
 import {
   BulbOutlined,
   FieldTimeOutlined,
+  LinkOutlined,
   ThunderboltOutlined,
   FolderOpenOutlined,
   InboxOutlined,
@@ -183,6 +184,17 @@ export default function AppShell({
                 style={{ justifyContent: 'flex-start' }}
               >
                 Trending
+              </Button>
+            </Link>
+            <Link href="/direct">
+              <Button
+                block
+                type="text"
+                data-testid="nav-direct"
+                icon={<LinkOutlined />}
+                style={{ justifyContent: 'flex-start' }}
+              >
+                Direct URLs
               </Button>
             </Link>
             <Link href="/recreate">

@@ -276,8 +276,96 @@ def handle_media_fetch(ctx: HandlerContext, payload: dict) -> None:
     )
 
 
+def handle_url_fetch(ctx: HandlerContext, payload: dict) -> None:
+    """Fetch one post reached by a pasted link rather than a profile walk.
+
+    The owner may never have been synced, so everything the row needs --
+    including a stub profiles row for the FK -- comes from the fetch itself.
+    Metadata and files land in the same tables a profile walk fills, which is
+    what lets download, ensure and recreate treat the post as any other.
+    """
+    shortcode = payload["shortcode"]
+    url = payload.get("url") or f"https://www.instagram.com/p/{shortcode}/"
+
+    item = ctx.conn.execute(
+        "SELECT full_status FROM media_items WHERE shortcode=?", (shortcode,)
+    ).fetchone()
+    if item is not None and item["full_status"] == "ready":
+        return
+    if item is not None:
+        # A profile walk has already indexed this post, so the Graph path
+        # knows how to fetch it -- including image posts and carousels, which
+        # yt-dlp would refuse with "no video". The pasted link only has to
+        # get the file; it does not care which door it came through.
+        handle_media_fetch(ctx, {"shortcode": shortcode})
+        return
+
+    ctx.pacer.wait()
+    username, post, saved_files = ctx.adapter.fetch_url(url, ctx.settings.media_dir)
+
+    # Stub only: enough to satisfy the FK without claiming a sync happened.
+    # A later profile_sync fills in the real fields over this row.
+    ctx.conn.execute(
+        "INSERT INTO profiles (username, created_at) VALUES (?,?)"
+        " ON CONFLICT(username) DO NOTHING",
+        (username, now_iso()),
+    )
+
+    ctx.conn.execute(
+        "INSERT INTO media_items (shortcode, username, kind, taken_at, caption,"
+        " is_video, child_count, ig_url, discovered_at,"
+        " like_count, comments_count, view_count)"
+        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?)"
+        " ON CONFLICT(shortcode) DO UPDATE SET"
+        " caption=excluded.caption, child_count=excluded.child_count,"
+        " like_count=excluded.like_count,"
+        " comments_count=excluded.comments_count,"
+        " view_count=excluded.view_count",
+        (
+            post.shortcode,
+            username,
+            post.kind,
+            post.taken_at_iso,
+            post.caption,
+            int(post.is_video),
+            post.child_count,
+            post.ig_url,
+            now_iso(),
+            post.like_count,
+            post.comments_count,
+            post.view_count,
+        ),
+    )
+
+    _ensure_thumb(ctx, username, post)
+
+    for saved in saved_files:
+        ctx.conn.execute(
+            "INSERT INTO media_files (shortcode, role, child_idx, path, mime, bytes,"
+            " width, height) VALUES (?,'full',?,?,?,?,?,?)"
+            " ON CONFLICT(shortcode, role, child_idx) DO UPDATE SET"
+            " path=excluded.path, mime=excluded.mime, bytes=excluded.bytes,"
+            " width=excluded.width, height=excluded.height",
+            (
+                shortcode,
+                saved.child_idx,
+                paths.rel_path(ctx.settings.media_dir, saved.path),
+                saved.mime,
+                saved.bytes,
+                saved.width,
+                saved.height,
+            ),
+        )
+
+    ctx.conn.execute(
+        "UPDATE media_items SET full_status='ready', full_error=NULL WHERE shortcode=?",
+        (shortcode,),
+    )
+
+
 HANDLERS = {
     "profile_sync": handle_profile_sync,
     "page_fetch": handle_page_fetch,
     "media_fetch": handle_media_fetch,
+    "url_fetch": handle_url_fetch,
 }

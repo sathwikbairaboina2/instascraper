@@ -3,7 +3,7 @@ import sqlite3
 
 from app.clock import now_iso
 
-PRIORITY = {"media_fetch": 10, "profile_sync": 20, "page_fetch": 30}
+PRIORITY = {"media_fetch": 10, "url_fetch": 15, "profile_sync": 20, "page_fetch": 30}
 MAX_ATTEMPTS = 3
 
 

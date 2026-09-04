@@ -221,6 +221,27 @@ export const prepareRecreate = (shortcode: string, slides: number[] | null) =>
     body: JSON.stringify({ slides }),
   })
 
+export type DirectUrlItem = {
+  shortcode: string
+  url: string
+  added_at: string
+  status: 'pending' | 'failed' | 'indexed'
+  username: string | null
+  error: string | null
+  media: MediaSummary | null
+}
+
+export const addDirectUrls = (urls: string[]) =>
+  call<{ added: string[]; invalid: string[] }>('/api/urls', {
+    method: 'POST',
+    body: JSON.stringify({ urls }),
+  })
+export const listDirectUrls = () => call<{ items: DirectUrlItem[] }>('/api/urls')
+export const removeDirectUrl = (shortcode: string) =>
+  call<{ removed: number }>(`/api/urls/${encodeURIComponent(shortcode)}`, {
+    method: 'DELETE',
+  })
+
 export type TrendWindow = 'day' | 'week'
 
 export type TrendingTag = {

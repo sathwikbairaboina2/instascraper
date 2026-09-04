@@ -257,6 +257,72 @@ class GraphAdapter:
                 return [self._reels.download(shortcode, dest_dir / "full.mp4")]
             return self._download_all(refreshed, dest_dir)
 
+    def fetch_url(
+        self, url: str, media_root: Path
+    ) -> tuple[str, t.IgPost, list[t.SavedFile]]:
+        """Fetch a pasted post or reel link, owner unknown until it answers.
+
+        Business Discovery cannot look up an arbitrary shortcode, so the whole
+        fetch goes through the reel downloader: one yt-dlp call that downloads
+        the video and reports the metadata the row needs. The file can only be
+        placed once the metadata has named the owner, which is why this takes
+        the media root rather than a destination directory.
+        """
+        from datetime import datetime, timezone
+
+        from app.services.urls import parse_shortcode
+
+        shortcode = parse_shortcode(url)
+        if shortcode is None:
+            raise t.IgNotFound(f"not an Instagram post url: {url}")
+        if self._reels is None:
+            raise t.IgTransient("no reel downloader configured for direct fetches")
+
+        # Staged next to its final home and moved once the owner is known:
+        # yt-dlp needs a path before the metadata that decides the path exists.
+        staging = media_root / "_direct" / shortcode / "full.mp4"
+        saved, info = self._reels.download_url(url, staging)
+
+        # channel is the handle; uploader_id is Instagram's numeric account
+        # id and uploader the display name. Only the handle names a profile.
+        username = info.get("channel") or info.get("uploader_id") or info.get("uploader") or ""
+        if not username:
+            raise t.IgTransient("the download reported no owner for this post")
+
+        dest = paths.item_dir(media_root, username, shortcode) / "full.mp4"
+        if saved.path != dest:
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            saved.path.replace(dest)
+            saved = t.SavedFile(
+                child_idx=saved.child_idx,
+                path=dest,
+                mime=saved.mime,
+                bytes=saved.bytes,
+                width=saved.width,
+                height=saved.height,
+            )
+
+        timestamp = info.get("timestamp")
+        taken_at = (
+            datetime.fromtimestamp(timestamp, tz=timezone.utc).isoformat()
+            if timestamp
+            else ""
+        )
+        post = t.IgPost(
+            shortcode=shortcode,
+            kind="reel" if "/reel/" in url else "video",
+            taken_at_iso=taken_at,
+            caption=info.get("description") or "",
+            is_video=True,
+            child_count=1,
+            thumb_url=info.get("thumbnail") or "",
+            ig_url=url,
+            like_count=info.get("like_count"),
+            comments_count=info.get("comment_count"),
+            view_count=info.get("view_count"),
+        )
+        return username, post, [saved]
+
     def download_to(self, url: str, dest: Path) -> t.SavedFile:
         try:
             return self._download(t.MediaSource(0, url, "image/jpeg", False), dest)

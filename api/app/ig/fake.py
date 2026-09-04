@@ -206,6 +206,26 @@ class FakeAdapter:
         finally:
             self._exit("fetch_media", started)
 
+    def fetch_url(
+        self, url: str, media_root: Path
+    ) -> tuple[str, t.IgPost, list[t.SavedFile]]:
+        started = self._enter("fetch_url")
+        try:
+            from app.services.urls import parse_shortcode
+
+            shortcode = parse_shortcode(url)
+            if shortcode is None:
+                raise t.IgNotFound(url)
+            for username, bucket in self.posts.items():
+                for post in bucket:
+                    if post.shortcode == shortcode:
+                        dest_dir = paths.item_dir(media_root, username, shortcode)
+                        saved = self.fetch_media(shortcode, dest_dir)
+                        return username, post, saved
+            raise t.IgNotFound(shortcode)
+        finally:
+            self._exit("fetch_url", started)
+
     def download_to(self, url: str, dest: Path) -> t.SavedFile:
         started = self._enter("download_to")
         try:
