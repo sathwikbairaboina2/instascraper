@@ -49,6 +49,7 @@ import {
   getMedia,
   getProfile,
   loadMore,
+  mediaFullPath,
   setTracked,
   syncProfile,
   type MediaSummary,
@@ -465,7 +466,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
           {one && (
             <div style={{ padding: 16 }}>
               <img
-                src={one.full_status === 'ready' ? `/api/media/${one.shortcode}/full?child=${one.child_count > 1 ? 1 : 0}` : one.thumb_url}
+                src={one.full_status === 'ready' ? mediaFullPath(one.shortcode, one.child_count > 1 ? 1 : 0) : one.thumb_url}
                 alt=""
                 style={{ width: '100%', borderRadius: token.borderRadiusLG, display: 'block' }}
               />

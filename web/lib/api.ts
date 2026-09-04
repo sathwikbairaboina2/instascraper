@@ -152,6 +152,11 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
   return body as T
 }
 
+/** Path a cached file is served from. One definition, so the pages, the
+ *  lightbox and the copy control cannot drift apart on the route shape. */
+export const mediaFullPath = (shortcode: string, child = 0) =>
+  `/api/media/${encodeURIComponent(shortcode)}/full?child=${child}`
+
 export const getStatus = () => call<StatusBody>('/api/status')
 export const clearBreaker = () =>
   call<{ cleared: boolean }>('/api/health/clear-breaker', { method: 'POST' })

@@ -16,6 +16,8 @@ import type { MediaSummary } from '@/lib/api'
 import { compactCount } from '@/lib/format'
 import { GRADIENT_LINEAR } from '@/lib/themes'
 
+import CopyUrlButton from './CopyUrlButton'
+
 const { Text } = Typography
 
 function pill(children: React.ReactNode) {
@@ -260,6 +262,27 @@ export default function MediaTile({
             }}
           />
         </Tooltip>
+      )}
+
+      {item.full_status === 'ready' && (
+        <CopyUrlButton
+          shortcode={item.shortcode}
+          childIdxs={
+            // Carousel slides are 1-based; a lone file lives at child 0.
+            item.child_count > 1
+              ? Array.from({ length: item.child_count }, (_, i) => i + 1)
+              : [0]
+          }
+          style={{
+            position: 'absolute',
+            top: 8,
+            right: onRecreate ? 72 : 40,
+            color: '#fff',
+            background: 'rgba(6,8,12,.55)',
+            opacity: show ? 1 : 0.5,
+            transition: 'opacity .15s ease',
+          }}
+        />
       )}
 
       {item.full_status === 'failed' && (

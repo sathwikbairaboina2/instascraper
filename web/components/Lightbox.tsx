@@ -5,6 +5,9 @@ import { Button, Flex, Modal, Spin, Typography } from 'antd'
 import { useCallback, useEffect, useState } from 'react'
 
 import type { MediaSummary } from '@/lib/api'
+import { mediaFullPath } from '@/lib/api'
+
+import CopyUrlButton from './CopyUrlButton'
 
 const { Text } = Typography
 
@@ -49,7 +52,7 @@ export default function Lightbox({
     return () => window.removeEventListener('keydown', onKey)
   }, [step])
 
-  const src = `/api/media/${item.shortcode}/full?child=${child}`
+  const src = mediaFullPath(item.shortcode, child)
   // A carousel is never is_video, but a slide inside it can be. Asking the
   // post rendered every slide as an image and broke the video ones.
   const childIsVideo = isCarousel
@@ -70,6 +73,13 @@ export default function Lightbox({
             <Text type="secondary" style={{ fontSize: 12 }}>{child} of {item.child_count}</Text>
           )}
           <div style={{ flex: 1 }} />
+          {ready && (
+            <CopyUrlButton
+              shortcode={item.shortcode}
+              childIdxs={[child]}
+              testId="lightbox-copy-url"
+            />
+          )}
           <Button size="small" icon={<LinkOutlined />} href={item.ig_url} target="_blank">
             Instagram
           </Button>

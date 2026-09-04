@@ -6,11 +6,13 @@ import Link from 'next/link'
 import { use, useEffect, useState } from 'react'
 
 import AppShell from '@/components/AppShell'
+import CopyUrlButton from '@/components/CopyUrlButton'
 import { useThemePref } from '@/components/ThemeProvider'
 import {
   ensureMedia,
   getMedia,
   getRecreateItem,
+  mediaFullPath,
   prepareRecreate,
   type MediaSummary,
   type RecreatePayload,
@@ -39,7 +41,7 @@ function SlideImage({
   if (failed) return null
 
   const src = cached
-    ? `/api/media/${shortcode}/full?child=${child}`
+    ? mediaFullPath(shortcode, child)
     : `/api/media/${shortcode}/preview?child=${child}`
 
   return (
@@ -82,7 +84,7 @@ function BigSlide({
   const src = !usable
     ? fallback
     : cached
-      ? `/api/media/${shortcode}/full?child=${child}`
+      ? mediaFullPath(shortcode, child)
       : `/api/media/${shortcode}/preview?child=${child}`
 
   return (
@@ -229,6 +231,14 @@ export default function RecreateItemPage({
                 Slide {focus} of {source?.child_count ?? 0} ·{' '}
                 {chosen.includes(focus) ? 'included' : 'not included'}
               </Text>
+            )}
+            {cached && (
+              <Flex align="center" gap={6}>
+                <CopyUrlButton shortcode={shortcode} childIdxs={[focus ?? 0]} />
+                <Text style={{ fontSize: 11.5, color: tokens.textSecondary }}>
+                  Copy local URL
+                </Text>
+              </Flex>
             )}
           </Flex>
 
