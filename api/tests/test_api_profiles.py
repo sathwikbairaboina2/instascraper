@@ -175,3 +175,17 @@ def test_media_summary_carries_engagement(client, conn, settings, adapter):
     assert item["like_count"] == 101
     assert item["comments_count"] == 7
     assert item["view_count"] is None
+
+
+def test_a_deduped_sync_does_not_log_a_second_lookup(client, conn):
+    """Two rapid asks are one fetch, so they are one lookup line."""
+    first = client.post("/api/profiles/nike/sync").json()
+    second = client.post("/api/profiles/nike/sync").json()
+
+    assert first["queued"] is True
+    assert second["queued"] is False, "the second ask should have been deduped"
+
+    rows = conn.execute(
+        "SELECT COUNT(*) c FROM activity_log WHERE action='lookup' AND target='nike'"
+    ).fetchone()["c"]
+    assert rows == 1

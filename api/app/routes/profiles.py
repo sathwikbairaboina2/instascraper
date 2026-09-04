@@ -91,7 +91,11 @@ def get_avatar(username: str, request: Request, conn=Depends(get_conn_dep)):
 @router.post("/profiles/{username}/sync")
 def sync_profile(username: str, request: Request, conn=Depends(get_conn_dep)):
     job_id = queue.enqueue_unique(conn, "profile_sync", {"username": username})
-    activity.record(conn, "lookup", username, None)
+    # Only when a job was actually created. The page effect and the search box
+    # can both ask within the same second; enqueue_unique collapses those into
+    # one fetch, and the log should say one lookup rather than two.
+    if job_id is not None:
+        activity.record(conn, "lookup", username, None)
     wake_worker(request)
     return {"queued": job_id is not None}
 

@@ -17,3 +17,6 @@ api.log
 web.log
 .superpowers/
 web/tsconfig.tsbuildinfo
+
+# uvicorn stderr from a hand-started native run
+api.err
