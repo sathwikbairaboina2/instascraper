@@ -49,18 +49,39 @@ def settings_for(base: Settings, name: str) -> Settings:
     )
 
 
+@dataclass(frozen=True)
+class _UsageMemory:
+    """The shape `adopt_usage` reads, without needing a whole adapter."""
+
+    usage_peak: float
+
+    @property
+    def usage(self) -> float:
+        return self.usage_peak
+
+
 class RuntimeConfig:
     """Holds the live Runtime and the base settings every switch derives from."""
 
     def __init__(self, base: Settings, current: Runtime):
         self.base = base
         self._current = current
+        # Meta's allowance is spent by the app, not by whichever adapter object
+        # is live. Kept here so a trip through the fake adapter -- which has no
+        # quota of its own to remember -- does not lose the reading.
+        self._usage_seen = 0.0
 
     @property
     def current(self) -> Runtime:
         return self._current
 
     def swap(self, new: Runtime) -> None:
+        self._usage_seen = max(
+            self._usage_seen, getattr(self._current.adapter, "usage_peak", 0.0) or 0.0
+        )
+        adopt = getattr(new.adapter, "adopt_usage", None)
+        if adopt is not None:
+            adopt(_UsageMemory(self._usage_seen))
         self._current = new
 
     @classmethod

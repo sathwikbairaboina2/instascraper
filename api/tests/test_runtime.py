@@ -116,3 +116,50 @@ def test_prepare_data_root_is_idempotent(settings):
     runtime.prepare_data_root(target)
     runtime.prepare_data_root(target)
     assert target.db_path.exists()
+
+
+class _FakeGraph:
+    """Just enough of GraphAdapter for the usage handoff."""
+
+    def __init__(self, usage: float = 0.0):
+        self._usage = usage
+        self._peak = usage
+
+    @property
+    def usage(self) -> float:
+        return self._usage
+
+    @property
+    def usage_peak(self) -> float:
+        return self._peak
+
+    def adopt_usage(self, other) -> None:
+        self._usage = max(self._usage, getattr(other, "usage", 0.0) or 0.0)
+        self._peak = max(self._peak, getattr(other, "usage_peak", 0.0) or 0.0)
+
+
+def test_usage_survives_a_round_trip_through_the_fake_adapter(settings):
+    """The quota belongs to the app, not to whichever adapter object is live.
+
+    Switching to fake and back used to build a clean GraphAdapter reading 0%,
+    which both misreported the header and disarmed the backoff guard.
+    """
+    spent = _FakeGraph(usage=41.0)
+    holder = runtime.RuntimeConfig(settings, runtime.Runtime("graph", settings, spent))
+
+    holder.swap(runtime.Runtime("fake", settings, object()))
+    fresh = _FakeGraph(usage=0.0)
+    holder.swap(runtime.Runtime("graph", settings, fresh))
+
+    assert fresh.usage_peak == 41.0
+    assert fresh.usage == 41.0
+
+
+def test_swapping_to_an_adapter_without_usage_is_harmless(settings):
+    holder = runtime.RuntimeConfig(
+        settings, runtime.Runtime("graph", settings, _FakeGraph(usage=12.0))
+    )
+
+    holder.swap(runtime.Runtime("fake", settings, object()))
+
+    assert holder.current.name == "fake"

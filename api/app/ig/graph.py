@@ -125,7 +125,11 @@ class GraphAdapter:
     """Reads public Business and Creator accounts via Business Discovery."""
 
     def __init__(
-        self, settings: Settings, transport=None, fetcher=None, reel_downloader=None
+        self,
+        settings: Settings,
+        transport=None,
+        fetcher=None,
+        reel_downloader=None,
     ):
         self._settings = settings
         self._transport = transport or _httpx_transport
@@ -144,6 +148,18 @@ class GraphAdapter:
     def usage_peak(self) -> float:
         """Highest reading seen this process. What the backoff guard trusts."""
         return self._usage_peak
+
+    def adopt_usage(self, other) -> None:
+        """Inherit another adapter's quota readings.
+
+        Meta's allowance belongs to the app, not to whichever object is holding
+        a token right now. Building a fresh adapter -- which the runtime toggle
+        does -- used to reset the peak to zero, disabling the backoff guard
+        until the next response happened to restore it, and reporting 0% in the
+        meantime while Meta still had us near the ceiling.
+        """
+        self._usage = max(self._usage, getattr(other, "usage", 0.0) or 0.0)
+        self._usage_peak = max(self._usage_peak, getattr(other, "usage_peak", 0.0) or 0.0)
 
     # ---- transport -----------------------------------------------------
     def _get(self, fields: str) -> dict:
@@ -205,6 +221,7 @@ class GraphAdapter:
         # the empty string as a malformed request -- which the adapter would
         # then wrap as transient and retry, three times, pointlessly.
         sources = tuple(s for s in hint.sources if s.url) if hint else ()
+
         if not sources:
             sources = self._refresh(shortcode, hint)
         if not sources:
