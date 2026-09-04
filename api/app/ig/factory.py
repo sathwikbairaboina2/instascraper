@@ -15,12 +15,17 @@ def make_adapter(settings: Settings):
 
         return seeded_adapter()
 
+    from app.ig.embed import EmbedLookup
     from app.ig.graph import GraphAdapter
     from app.ig.reels import ReelDownloader
 
+    # One ledger for both: they are the app's only two callers of
+    # instagram.com, and the cap counts requests, not which module sent them.
+    spend = _spend(settings)
     return GraphAdapter(
         settings,
-        reel_downloader=ReelDownloader(settings, spend=_spend(settings)),
+        reel_downloader=ReelDownloader(settings, spend=spend),
+        embed=EmbedLookup(settings, spend=spend),
         on_refresh=_store_sources(settings),
     )
 

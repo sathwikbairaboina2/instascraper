@@ -6,6 +6,7 @@ exist only inside a listing response.
 """
 
 import json
+from dataclasses import replace
 from pathlib import Path
 from urllib.parse import quote
 
@@ -131,12 +132,16 @@ class GraphAdapter:
         fetcher=None,
         reel_downloader=None,
         on_refresh=None,
+        embed=None,
     ):
         self._settings = settings
         self._transport = transport or _httpx_transport
         self._fetcher = fetcher or _httpx_fetcher
         # Present only for the gap Business Discovery leaves: reel video.
         self._reels = reel_downloader
+        # Names the owner of a pasted link when yt-dlp will not, which is the
+        # only thing standing between an image post and Business Discovery.
+        self._embed = embed
         # Called with every post a refresh listing returned. Bound by the
         # factory, because an adapter has no database access of its own -- the
         # same reason the reel budget is spent through a callback.
@@ -262,11 +267,16 @@ class GraphAdapter:
     ) -> tuple[str, t.IgPost, list[t.SavedFile]]:
         """Fetch a pasted post or reel link, owner unknown until it answers.
 
-        Business Discovery cannot look up an arbitrary shortcode, so the whole
+        Business Discovery cannot look up an arbitrary shortcode, so a video
         fetch goes through the reel downloader: one yt-dlp call that downloads
-        the video and reports the metadata the row needs. The file can only be
+        the file and reports the metadata the row needs. The file can only be
         placed once the metadata has named the owner, which is why this takes
         the media root rather than a destination directory.
+
+        yt-dlp serves video and nothing else, so a link to pictures comes back
+        refused. That is not the end of the road: the embed page names the
+        owner, and with a name Business Discovery can hand over the same
+        pictures it serves for every post reached by a profile walk.
         """
         from datetime import datetime, timezone
 
@@ -281,7 +291,12 @@ class GraphAdapter:
         # Staged next to its final home and moved once the owner is known:
         # yt-dlp needs a path before the metadata that decides the path exists.
         staging = media_root / "_direct" / shortcode / "full.mp4"
-        saved, info = self._reels.download_url(url, staging)
+        try:
+            saved, info = self._reels.download_url(url, staging)
+        except t.IgNoVideo:
+            if self._embed is None:
+                raise
+            return self._fetch_pictures(url, shortcode, media_root)
 
         # channel is the handle; uploader_id is Instagram's numeric account
         # id and uploader the display name. Only the handle names a profile.
@@ -323,6 +338,21 @@ class GraphAdapter:
         )
         return username, post, [saved]
 
+    def _fetch_pictures(
+        self, url: str, shortcode: str, media_root: Path
+    ) -> tuple[str, t.IgPost, list[t.SavedFile]]:
+        """The image-post half of `fetch_url`: embed for the name, Graph for the files."""
+        username = self._embed.owner(url)
+        post = self._find_post(username, shortcode)
+        if not post.sources:
+            raise t.IgNotFound(
+                f"Meta publishes no downloadable file for {shortcode}"
+            )
+        saved = self._download_all(post.sources, paths.item_dir(media_root, username, shortcode))
+        # The pasted link is what the row is a bookmark for, tracking
+        # parameters and all; the permalink Meta reports is the same post.
+        return username, replace(post, ig_url=url), saved
+
     def download_to(self, url: str, dest: Path) -> t.SavedFile:
         try:
             return self._download(t.MediaSource(0, url, "image/jpeg", False), dest)
@@ -352,26 +382,34 @@ class GraphAdapter:
             raise t.IgNotFound(
                 f"{shortcode} has no owning profile recorded; re-sync it before opening"
             )
+        # Empty sources mean Meta published no file for this post, which is a
+        # fallback opportunity rather than an error, so the judgement belongs
+        # to the caller.
+        return self._find_post(hint.username, shortcode).sources
+
+    def _find_post(self, username: str, shortcode: str) -> t.IgPost:
+        """Walk the owner's listing until the shortcode turns up.
+
+        Business Discovery has no per-media endpoint, so this is the only way
+        to reach one post: page through the profile that owns it.
+        """
         cursor: str | None = None
         for _ in range(max(1, self._settings.graph_refresh_pages)):
-            page = self.fetch_page(hint.username, cursor, self._settings.page_size)
+            page = self.fetch_page(username, cursor, self._settings.page_size)
             # A refresh costs a page call and comes back with fresh urls for
             # every post on that page, not just the one being opened. Throwing
             # the rest away made the next stale post in the same page pay the
             # same price over again.
             if self._on_refresh is not None and page.posts:
-                self._on_refresh(hint.username, page.posts)
+                self._on_refresh(username, page.posts)
             for post in page.posts:
                 if post.shortcode == shortcode:
-                    # Found. Empty means Meta published no file for it, which
-                    # is a fallback opportunity rather than an error, so the
-                    # judgement belongs to the caller.
-                    return post.sources
+                    return post
             cursor = page.next_cursor
             if cursor is None:
                 break
         raise t.IgNotFound(
-            f"{shortcode} is too far back to refresh; re-sync {hint.username} to open it"
+            f"{shortcode} is too far back to refresh; re-sync {username} to open it"
         )
 
     def _download_all(

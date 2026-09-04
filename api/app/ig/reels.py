@@ -54,8 +54,10 @@ def classify_failure(stderr: str) -> t.IgError:
     if "not available" in lowered or "unavailable" in lowered or "removed" in lowered:
         return t.IgNotFound("the reel is no longer available")
     if "no video" in lowered:
-        # An image post. yt-dlp only serves video; retrying cannot change that.
-        return t.IgNotFound("this link is an image post, which direct fetch cannot download yet")
+        # An image post. yt-dlp only serves video, so retrying it cannot
+        # change the answer -- but the Graph API can still have the pictures,
+        # which is what the distinct type lets the adapter go and find out.
+        return t.IgNoVideo("this link is an image post, which yt-dlp cannot download")
     detail = (stderr or "").strip().splitlines()[-1] if (stderr or "").strip() else "no output"
     return t.IgTransient(f"yt-dlp failed: {detail}")
 

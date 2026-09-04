@@ -11,6 +11,15 @@ class IgNotFound(IgError):
     """Profile or post does not exist. Terminal."""
 
 
+class IgNoVideo(IgNotFound):
+    """The post exists and holds pictures rather than a video.
+
+    A subclass because it stays terminal for anyone downloading video, while
+    letting a caller that can fetch pictures recognise its one chance to try
+    another door instead of giving up.
+    """
+
+
 class IgPrivate(IgError):
     """Profile exists but is not public. Terminal, out of scope."""
 

@@ -12,7 +12,11 @@ import re
 _SHORTCODE = re.compile(
     r"^(?:https?://)?(?:www\.)?instagram\.com"
     r"(?:/[A-Za-z0-9_.]+)?"  # optional owner segment in share links
-    r"/(?:p|reel|tv)/([A-Za-z0-9_-]+)/?(?:[?#].*)?$"
+    # The query string stops at the first comma or space. Letting it run to
+    # the end made a comma-joined list of links parse as its first link and
+    # quietly discard the others, which is precisely the guess this module
+    # exists to refuse.
+    r"/(?:p|reel|tv)/([A-Za-z0-9_-]+)/?(?:[?#][^\s,]*)?$"
 )
 
 

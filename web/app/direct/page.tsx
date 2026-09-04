@@ -102,8 +102,11 @@ export default function DirectUrlsPage() {
   )
 
   const submit = async () => {
+    // Commas separate too: share sheets hand out comma-joined lists, and a
+    // whitespace-only split turned one of those into a single string whose
+    // trailing links were swallowed by the query-string part of the pattern.
     const urls = input
-      .split(/\s+/)
+      .split(/[\s,]+/)
       .map((s) => s.trim())
       .filter(Boolean)
     if (urls.length === 0) return

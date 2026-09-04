@@ -44,3 +44,12 @@ def test_rejects_garbage():
 def test_rejects_empty():
     assert parse_shortcode("") is None
     assert parse_shortcode("   ") is None
+
+
+def test_rejects_several_links_run_together():
+    """Taking the first of a comma-joined list would silently drop the rest."""
+    joined = (
+        "https://www.instagram.com/p/C8xPqR9abcd/?igsh=abc,"
+        "https://www.instagram.com/p/C8yQvW2xyz/?igsh=def"
+    )
+    assert parse_shortcode(joined) is None
