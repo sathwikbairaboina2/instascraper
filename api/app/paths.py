@@ -1,13 +1,24 @@
 import os
-import re
 import shutil
+import unicodedata
 from pathlib import Path
 from typing import BinaryIO, Callable
 
 PostFiles = tuple[str, list[tuple[int, str]]]
 NamedFile = tuple[str, int, str]
 
-_UNSAFE = re.compile(r"[^A-Za-z0-9]+")
+# Letters, numbers and marks, plus underscore and its relatives. Marks are the
+# reason this is a category test rather than a regex class: `\w` excludes
+# combining marks, so a Devanagari name is cut at its first vowel sign and the
+# feature quietly becomes Latin-only. Same rule the hashtag parser uses, for
+# the same reason.
+_KEEP = ("L", "N", "M")
+
+# Leaves room for the `_07b.jpg` that gets appended, well inside the 255-byte
+# component limit every filesystem we care about enforces. A name longer than
+# this is truncated rather than refused: the alternative is an OSError from
+# deep inside the writer, which is what this used to do.
+MAX_BASE = 120
 
 
 def item_dir(media_root: Path, username: str, shortcode: str) -> Path:
@@ -23,13 +34,26 @@ def full_filename(child_idx: int, ext: str) -> str:
 
 
 def sanitize_base(base: str) -> str:
-    """Collapse anything that is not alphanumeric into a single underscore.
+    """Collapse anything that cannot be part of a name into a single underscore.
 
     Path separators and traversal sequences cannot survive this, so a base
     filename can never escape the output directory.
+
+    Unicode letters are kept. Stripping them would silently delete most of a
+    name written in Hindi, Arabic or Japanese, and collapse two different
+    non-Latin names onto the same `download` fallback.
     """
-    cleaned = _UNSAFE.sub("_", base.strip()).strip("_")
-    return cleaned or "download"
+    out: list[str] = []
+    for ch in base.strip():
+        category = unicodedata.category(ch)
+        if category[0] in _KEEP or category == "Pc":
+            out.append(ch)
+        elif out and out[-1] != "_":
+            out.append("_")
+
+    cleaned = "".join(out).strip("_")
+    # Truncating can strand a trailing underscore that was legal mid-name.
+    return cleaned[:MAX_BASE].strip("_") or "download"
 
 
 def download_names(posts: list[PostFiles], base: str) -> list[NamedFile]:
@@ -59,7 +83,14 @@ def atomic_write(dest: Path, write: Callable[[BinaryIO], None]) -> int:
         os.replace(part, dest)
         return size
     except BaseException:
-        part.unlink(missing_ok=True)
+        # The cleanup must not raise over the top of the real failure. An
+        # unwritable path fails the unlink for the same reason it failed the
+        # open, and the second error is the one that reaches the caller --
+        # naming the tidy-up instead of the problem.
+        try:
+            part.unlink(missing_ok=True)
+        except OSError:
+            pass
         raise
 
 

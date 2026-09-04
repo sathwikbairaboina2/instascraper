@@ -4,6 +4,7 @@ import { Layout, Table, Typography } from 'antd'
 
 import AppShell from '@/components/AppShell'
 import { getActivity, type ActivityItem } from '@/lib/api'
+import { plural } from '@/lib/format'
 import { usePolling } from '@/lib/usePolling'
 
 const { Content } = Layout
@@ -12,7 +13,7 @@ const { Text } = Typography
 function detailOf(item: ActivityItem): string {
   const d = item.detail
   if (!d) return ''
-  if (item.action === 'download') return `${d.count} files as "${d.base}" to ${d.out}`
+  if (item.action === 'download') return `${plural(Number(d.count), 'file')} as "${d.base}" to ${d.out}`
   return JSON.stringify(d)
 }
 

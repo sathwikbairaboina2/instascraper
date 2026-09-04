@@ -34,6 +34,52 @@ def test_sanitize_base_strips_separators_and_traversal(raw, expected):
     assert paths.sanitize_base(raw) == expected
 
 
+@pytest.mark.parametrize(
+    "raw,expected",
+    [
+        # Devanagari survives. The old rule deleted it and left "2026", so two
+        # differently-named batches landed in the same series.
+        ("नाइकी 2026", "नाइकी_2026"),
+        ("كرة القدم", "كرة_القدم"),
+        ("東京 2026", "東京_2026"),
+        # A combining mark is part of the letter before it, not a separator.
+        ("café", "café"),
+        # Still nothing but separators once the letters are gone.
+        ("///***", "download"),
+    ],
+)
+def test_sanitize_base_keeps_non_latin_names(raw, expected):
+    assert paths.sanitize_base(raw) == expected
+
+
+def test_sanitize_base_caps_length_rather_than_failing_later():
+    """A 300-character name used to reach the filesystem and raise OSError."""
+    out = paths.sanitize_base("a" * 300)
+
+    assert len(out) == paths.MAX_BASE
+    assert out == "a" * paths.MAX_BASE
+
+
+def test_sanitize_base_does_not_end_on_an_underscore_after_truncation():
+    out = paths.sanitize_base("a" * (paths.MAX_BASE - 1) + " tail")
+
+    assert not out.endswith("_")
+
+
+def test_atomic_write_cleanup_does_not_mask_the_real_failure(tmp_path):
+    """The tidy-up must not raise over the top of the error it is tidying."""
+    boom = RuntimeError("the real problem")
+
+    def explode(fh):
+        raise boom
+
+    with pytest.raises(RuntimeError) as caught:
+        paths.atomic_write(tmp_path / "out.jpg", explode)
+
+    assert caught.value is boom
+    assert not (tmp_path / "out.jpg.part").exists()
+
+
 def test_download_names_single_items_zero_padded():
     posts = [("A", [(0, "jpg")]), ("B", [(0, "mp4")]), ("C", [(0, "jpg")])]
     assert paths.download_names(posts, "trip") == [

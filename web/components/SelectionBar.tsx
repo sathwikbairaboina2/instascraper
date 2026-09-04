@@ -5,12 +5,14 @@ import { Alert, Button, Input, Progress, Typography } from 'antd'
 import { useEffect, useRef, useState } from 'react'
 
 import { createDownload, ensureMedia, type DownloadResult, type EnsureResult } from '@/lib/api'
+import { plural, sanitizeBase } from '@/lib/format'
 
 const { Text } = Typography
 
 type Phase = 'idle' | 'waiting' | 'copying' | 'done' | 'error'
 
 const POLL_MS = 1500
+const EMPTY_BASE = 'Enter a base filename first.'
 
 export default function SelectionBar({
   shortcodes,
@@ -52,6 +54,14 @@ export default function SelectionBar({
     },
     [],
   )
+
+  // An error about an empty field has no business outliving the empty field.
+  useEffect(() => {
+    if (base.trim() && error === EMPTY_BASE) {
+      setError(null)
+      setPhase('idle')
+    }
+  }, [base, error])
 
   async function copyNow() {
     setPhase('copying')
@@ -110,7 +120,7 @@ export default function SelectionBar({
 
   async function start() {
     if (!base.trim()) {
-      setError('Enter a base filename first.')
+      setError(EMPTY_BASE)
       setPhase('error')
       return
     }
@@ -128,6 +138,9 @@ export default function SelectionBar({
   }
 
   const running = phase === 'waiting' || phase === 'copying'
+  // What the files will actually be called. Showing the raw text promised a
+  // name the server was never going to write.
+  const safeBase = sanitizeBase(base)
   const pct = progress && progress.total ? Math.round((progress.ready / progress.total) * 100) : 0
 
   return (
@@ -156,7 +169,7 @@ export default function SelectionBar({
 
       {base.trim() && (
         <Text type="secondary" style={{ fontSize: 11, display: 'block', marginTop: 7 }}>
-          {base.trim()}_01 through {base.trim()}_{String(fileCount).padStart(2, '0')}
+          {safeBase}_01 through {safeBase}_{String(fileCount).padStart(2, '0')}
         </Text>
       )}
 
@@ -170,7 +183,7 @@ export default function SelectionBar({
         onClick={start}
         style={{ marginTop: 16 }}
       >
-        {running ? 'Downloading' : `Download ${fileCount} files`}
+        {running ? 'Downloading' : `Download ${plural(fileCount, 'file')}`}
       </Button>
 
       <Button block type="text" data-testid="clear-selection" style={{ marginTop: 8 }} onClick={onClear}>
@@ -192,7 +205,7 @@ export default function SelectionBar({
           type="success"
           showIcon
           data-testid="download-result"
-          title={`${result.count} files`}
+          title={plural(result.count, 'file')}
           description={result.out_dir}
         />
       )}

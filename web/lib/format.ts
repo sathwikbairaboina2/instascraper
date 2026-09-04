@@ -18,3 +18,24 @@ export function compactCount(n: number | null | undefined): string | null {
   if (n >= 1_000) return scale(n, 1_000, 'K')
   return String(n)
 }
+
+/** "1 file", "3 files". The log used to read "1 files". */
+export function plural(n: number, one: string, many = `${one}s`): string {
+  return `${n} ${n === 1 ? one : many}`
+}
+
+// Letters, numbers and marks, plus underscore. Mirrors paths.sanitize_base on
+// the server, including keeping non-Latin names: this is what the filename
+// preview has to show, and showing the raw text promised files the server was
+// never going to write.
+const KEEP = /[\p{L}\p{N}\p{M}\p{Pc}]/u
+
+/** The name the server will actually use. Keep in step with app/paths.py. */
+export function sanitizeBase(base: string, maxLength = 120): string {
+  let out = ''
+  for (const ch of base.trim()) {
+    if (KEEP.test(ch)) out += ch
+    else if (out && !out.endsWith('_')) out += '_'
+  }
+  return out.replace(/^_+|_+$/g, '').slice(0, maxLength).replace(/_+$/g, '') || 'download'
+}
