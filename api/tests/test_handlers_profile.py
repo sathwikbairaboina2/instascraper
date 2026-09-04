@@ -57,6 +57,7 @@ def test_profile_sync_enqueues_first_page_only_once(ctx):
     ctx.conn.execute("UPDATE profiles SET next_cursor='7' WHERE username='nike'")
     ctx.enqueued.clear()
     handlers.handle_profile_sync(ctx, {"username": "nike"})
+
     assert ctx.enqueued == []
 
 
@@ -262,3 +263,69 @@ def test_thumbnails_are_paced_separately_from_graph_calls(ctx, settings):
     # One Graph call for the listing, one CDN fetch per thumbnail on it.
     assert ctx.pacer.waits - graph_before == 1
     assert ctx.cdn_pacer.waits - cdn_before == settings.first_page_size
+
+
+def test_page_fetch_readopts_a_thumbnail_whose_row_went_missing(ctx, settings):
+    """A file on disk with no media_files row used to stay invisible forever.
+
+    The old guard skipped the fetch when the file existed, and the insert lived
+    inside that same branch, so the row was never written back. The api serves
+    the row, not the file, and the tile stayed broken until the whole profile
+    cache was cleared.
+    """
+    ctx.adapter.add_profile("nike", post_count=1)
+    ctx.adapter.add_posts("nike", count=1)
+    handlers.handle_profile_sync(ctx, {"username": "nike"})
+    handlers.handle_page_fetch(ctx, {"username": "nike"})
+
+    shortcode = ctx.conn.execute(
+        "SELECT shortcode FROM media_items WHERE username='nike'"
+    ).fetchone()["shortcode"]
+    thumb = settings.media_dir / "nike" / shortcode / "thumb.jpg"
+    assert thumb.exists()
+
+    # Lose the row, keep the file. This is the state a crash between the write
+    # and the insert leaves behind.
+    ctx.conn.execute(
+        "DELETE FROM media_files WHERE shortcode=? AND role='thumb'", (shortcode,)
+    )
+    ctx.conn.execute("UPDATE profiles SET next_cursor=NULL WHERE username='nike'")
+    before = ctx.cdn_pacer.waits
+
+    handlers.handle_page_fetch(ctx, {"username": "nike"})
+
+    row = ctx.conn.execute(
+        "SELECT path, bytes FROM media_files WHERE shortcode=? AND role='thumb'",
+        (shortcode,),
+    ).fetchone()
+    assert row is not None, "the row should have been written back"
+    assert row["bytes"] == thumb.stat().st_size
+    assert ctx.cdn_pacer.waits == before, "adopting a cached file must not re-fetch it"
+
+
+def test_page_fetch_still_downloads_when_the_file_is_gone(ctx, settings):
+    ctx.adapter.add_profile("nike", post_count=1)
+    ctx.adapter.add_posts("nike", count=1)
+    handlers.handle_profile_sync(ctx, {"username": "nike"})
+    handlers.handle_page_fetch(ctx, {"username": "nike"})
+
+    shortcode = ctx.conn.execute(
+        "SELECT shortcode FROM media_items WHERE username='nike'"
+    ).fetchone()["shortcode"]
+    thumb = settings.media_dir / "nike" / shortcode / "thumb.jpg"
+    thumb.unlink()
+    ctx.conn.execute(
+        "DELETE FROM media_files WHERE shortcode=? AND role='thumb'", (shortcode,)
+    )
+    ctx.conn.execute("UPDATE profiles SET next_cursor=NULL WHERE username='nike'")
+
+    handlers.handle_page_fetch(ctx, {"username": "nike"})
+
+    assert thumb.exists()
+    assert ctx.conn.execute(
+        "SELECT 1 FROM media_files WHERE shortcode=? AND role='thumb'", (shortcode,)
+    ).fetchone() is not None
+
+
+
+

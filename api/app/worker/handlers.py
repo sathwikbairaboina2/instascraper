@@ -3,6 +3,7 @@ import json
 from app import paths
 from app.clock import now_iso
 from app.ig import types as t
+from app.probe import dimensions
 from app.worker.runner import HandlerContext
 
 
@@ -125,28 +126,62 @@ def handle_page_fetch(ctx: HandlerContext, payload: dict) -> None:
             ),
         )
 
-        thumb_dest = paths.item_dir(ctx.settings.media_dir, username, post.shortcode) / "thumb.jpg"
-        if not thumb_dest.exists():
-            ctx.cdn_pacer.wait()
-            saved = ctx.adapter.download_to(post.thumb_url, thumb_dest)
-            ctx.conn.execute(
-                "INSERT INTO media_files (shortcode, role, child_idx, path, mime, bytes,"
-                " width, height) VALUES (?,'thumb',0,?,?,?,?,?)"
-                " ON CONFLICT(shortcode, role, child_idx) DO UPDATE SET"
-                " path=excluded.path, bytes=excluded.bytes",
-                (
-                    post.shortcode,
-                    paths.rel_path(ctx.settings.media_dir, thumb_dest),
-                    saved.mime,
-                    saved.bytes,
-                    saved.width,
-                    saved.height,
-                ),
-            )
+        _ensure_thumb(ctx, username, post)
 
     ctx.conn.execute(
         "UPDATE profiles SET next_cursor=? WHERE username=?",
         ("" if page.next_cursor is None else page.next_cursor, username),
+    )
+
+
+def _ensure_thumb(ctx: HandlerContext, username: str, post) -> None:
+    """Make sure the thumbnail is both on disk and in media_files.
+
+    The guard is on the row, not the file. Keying it on the file meant that a
+    row lost for any reason -- a crash between the write and the insert -- left
+    a cached thumbnail the api could not find, because the endpoint reads the
+    row. Re-syncing could not heal it either: the file was there, so the fetch
+    was skipped and the row was never written back. The tile stayed broken
+    until someone cleared the whole profile's cache.
+    """
+    dest = paths.item_dir(ctx.settings.media_dir, username, post.shortcode) / "thumb.jpg"
+    row = ctx.conn.execute(
+        "SELECT 1 FROM media_files WHERE shortcode=? AND role='thumb' AND child_idx=0",
+        (post.shortcode,),
+    ).fetchone()
+    if row is not None and dest.exists():
+        return
+
+    if dest.exists():
+        # Adopt what is already there rather than spending a fetch on bytes we
+        # have. Dimensions come from the file, which is the only honest source.
+        width, height = dimensions(dest) or (None, None)
+        saved = t.SavedFile(
+            child_idx=0,
+            path=dest,
+            mime="image/jpeg",
+            bytes=dest.stat().st_size,
+            width=width,
+            height=height,
+        )
+    else:
+        ctx.cdn_pacer.wait()
+        saved = ctx.adapter.download_to(post.thumb_url, dest)
+
+    ctx.conn.execute(
+        "INSERT INTO media_files (shortcode, role, child_idx, path, mime, bytes,"
+        " width, height) VALUES (?,'thumb',0,?,?,?,?,?)"
+        " ON CONFLICT(shortcode, role, child_idx) DO UPDATE SET"
+        " path=excluded.path, bytes=excluded.bytes,"
+        " width=excluded.width, height=excluded.height",
+        (
+            post.shortcode,
+            paths.rel_path(ctx.settings.media_dir, dest),
+            saved.mime,
+            saved.bytes,
+            saved.width,
+            saved.height,
+        ),
     )
 
 
