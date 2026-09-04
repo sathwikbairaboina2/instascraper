@@ -9,11 +9,12 @@ will not follow -- which for "remake the thing I saw" is the right way round.
 
 import json
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 from app.clock import now_iso
 from app.main_deps import get_conn_dep
+from app.probe import dimensions
 
 router = APIRouter()
 
@@ -25,6 +26,9 @@ SELECTED = "selected"
 # "submitted" would claim a handoff that has not happened -- that word is
 # earned when the job reaches the creator's queue.
 PREPARED = "prepared"
+# The payload has reached instacreator's queue. Earned, not assumed: the
+# status flips only after the queue accepted the message.
+SUBMITTED = "submitted"
 
 
 class MarkBody(BaseModel):
@@ -105,8 +109,37 @@ def unmark(shortcode: str, conn=Depends(get_conn_dep)):
     return {"removed": cur.rowcount}
 
 
+def _backfill_dimensions(conn, media_dir, shortcode: str, files: dict) -> None:
+    """Read the size of any file whose row does not know it, and store it.
+
+    Rows written before the probe existed carry NULL here, and nothing else
+    ever revisits a file already on disk -- so the payload shipped
+    `"width": null` forever, which is exactly the thing the probe exists to
+    prevent. Reading a header is cheap; doing it once and remembering is
+    cheaper.
+    """
+    for child_idx, row in list(files.items()):
+        if row["width"] is not None and row["height"] is not None:
+            continue
+        path = media_dir / row["path"]
+        if not path.exists():
+            continue
+        size = dimensions(path)
+        if size is None:
+            continue
+        width, height = size
+        conn.execute(
+            "UPDATE media_files SET width=?, height=? WHERE shortcode=? AND role='full'"
+            " AND child_idx=?",
+            (width, height, shortcode, child_idx),
+        )
+        files[child_idx] = {**dict(row), "width": width, "height": height}
+
+
 @router.post("/recreate/{shortcode}/prepare")
-def prepare(shortcode: str, body: PrepareBody, conn=Depends(get_conn_dep)):
+def prepare(
+    shortcode: str, body: PrepareBody, request: Request, conn=Depends(get_conn_dep)
+):
     """Build the handoff payload from what is actually on disk.
 
     Every path in it is one we have just read out of media_files, so the
@@ -141,6 +174,9 @@ def prepare(shortcode: str, body: PrepareBody, conn=Depends(get_conn_dep)):
             status_code=409,
             detail={"message": "the post is not downloaded yet; fetch it before preparing"},
         )
+
+    media_dir = request.app.state.runtime.current.settings.media_dir
+    _backfill_dimensions(conn, media_dir, shortcode, files)
 
     wanted = sorted(files) if body.slides is None else sorted(set(body.slides))
     missing = [i for i in wanted if i not in files]
@@ -184,3 +220,38 @@ def prepare(shortcode: str, body: PrepareBody, conn=Depends(get_conn_dep)):
         (PREPARED, json.dumps(wanted), json.dumps(payload), now, now, shortcode),
     )
     return payload
+
+
+@router.post("/recreate/{shortcode}/submit")
+def submit(shortcode: str, request: Request, conn=Depends(get_conn_dep)):
+    """Publish a prepared payload to instacreator's queue.
+
+    Resubmitting is allowed on purpose: the receiver dedupes on source_ref,
+    and a lost message must have a recovery gesture cheaper than re-preparing.
+    """
+    item = conn.execute(
+        "SELECT status, payload FROM recreate_items WHERE shortcode=?", (shortcode,)
+    ).fetchone()
+    if item is None:
+        raise HTTPException(status_code=404, detail={"message": "not marked for recreation"})
+    if item["status"] not in (PREPARED, SUBMITTED) or not item["payload"]:
+        raise HTTPException(
+            status_code=409,
+            detail={"message": "prepare the item before submitting it"},
+        )
+
+    publisher = request.app.state.publisher
+    if not publisher.configured:
+        raise HTTPException(
+            status_code=503,
+            detail={"message": "no queue configured; set SQS_ENDPOINT to enable the handoff"},
+        )
+
+    from app.services.submit import envelope_from_payload
+
+    publisher.publish(envelope_from_payload(json.loads(item["payload"])))
+    conn.execute(
+        "UPDATE recreate_items SET status=?, updated_at=? WHERE shortcode=?",
+        (SUBMITTED, now_iso(), shortcode),
+    )
+    return {"status": SUBMITTED, "shortcode": shortcode}

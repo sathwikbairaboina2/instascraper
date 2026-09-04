@@ -72,6 +72,10 @@ def create_app(
     app.state.cdn_pacer = Pacer(min_interval=base.cdn_min_interval)
     app.state.worker = None
 
+    from app.services.submit import Publisher
+
+    app.state.publisher = Publisher(base.sqs_endpoint, base.sqs_queue)
+
     app.include_router(status_routes.router, prefix="/api")
     app.include_router(recreate_routes.router, prefix="/api")
     app.include_router(activity_routes.router, prefix="/api")

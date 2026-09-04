@@ -23,6 +23,10 @@ class Settings:
     reel_max_per_day: int
     reel_timeout: float
     reel_min_interval: float
+    # Where prepared recreate payloads are handed to instacreator. Empty
+    # endpoint means the handoff is off and submit answers 503.
+    sqs_endpoint: str = ""
+    sqs_queue: str = "recreate-jobs"
 
 
 def load_settings() -> Settings:
@@ -58,4 +62,6 @@ def load_settings() -> Settings:
         reel_max_per_day=int(os.environ.get("IG_REEL_MAX_PER_DAY", "100")),
         reel_timeout=float(os.environ.get("IG_REEL_TIMEOUT", "120")),
         reel_min_interval=float(os.environ.get("IG_REEL_MIN_INTERVAL", "20")),
+        sqs_endpoint=os.environ.get("SQS_ENDPOINT", ""),
+        sqs_queue=os.environ.get("SQS_QUEUE", "recreate-jobs"),
     )

@@ -199,3 +199,53 @@ def test_a_single_post_needs_no_slide_choice(client, conn, settings, adapter):
 
 def test_preparing_something_never_marked_is_a_404(client):
     assert client.post("/api/recreate/nope/prepare", json={"slides": None}).status_code == 404
+
+
+def test_preparing_reads_dimensions_a_row_never_learned(
+    client, conn, settings, adapter
+):
+    """Rows written before the probe existed shipped `"width": null` forever.
+
+    The probe was never the problem -- nothing re-read a file already on disk.
+    """
+    shortcode = seed(conn, settings, adapter)
+    conn.execute(
+        "UPDATE media_items SET full_status='ready' WHERE shortcode=?", (shortcode,)
+    )
+
+    # A real JPEG on disk, and a row that does not know how big it is.
+    dest = settings.media_dir / "nike" / shortcode / "full.jpg"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_bytes(_jpeg(width=800, height=600))
+    conn.execute(
+        "INSERT INTO media_files (shortcode, role, child_idx, path, mime, bytes,"
+        " width, height) VALUES (?,'full',0,?,?,?,NULL,NULL)",
+        (shortcode, f"nike/{shortcode}/full.jpg", "image/jpeg", dest.stat().st_size),
+    )
+    client.post("/api/recreate", json={"shortcodes": [shortcode]})
+
+    body = client.post(f"/api/recreate/{shortcode}/prepare", json={"slides": None}).json()
+
+    assert body["slides"][0]["width"] == 800
+    assert body["slides"][0]["height"] == 600
+
+    stored = conn.execute(
+        "SELECT width, height FROM media_files WHERE shortcode=? AND role='full'",
+        (shortcode,),
+    ).fetchone()
+    assert (stored["width"], stored["height"]) == (800, 600), "and remembered"
+
+
+def _jpeg(width: int, height: int) -> bytes:
+    """The smallest thing app.probe will read a size out of."""
+    import struct
+
+    return (
+        b"\xff\xd8"
+        + b"\xff\xc0"
+        + struct.pack(">H", 17)
+        + b"\x08"
+        + struct.pack(">HH", height, width)
+        + b"\x03\x01\x11\x00\x02\x11\x01\x03\x11\x01"
+        + b"\xff\xd9"
+    )

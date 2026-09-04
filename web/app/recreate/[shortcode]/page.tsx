@@ -14,6 +14,7 @@ import {
   getRecreateItem,
   mediaFullPath,
   prepareRecreate,
+  submitRecreate,
   type MediaSummary,
   type RecreatePayload,
 } from '@/lib/api'
@@ -121,6 +122,8 @@ export default function RecreateItemPage({
   // Which slide the big picture is showing. Picking one should let you look
   // at it, not just tick a box you cannot check.
   const [focus, setFocus] = useState<number | null>(null)
+  const [sending, setSending] = useState(false)
+  const [sendError, setSendError] = useState<string | null>(null)
 
   // The post itself is what says how many slides there are and whether the
   // files are already on disk. The recreate row is a snapshot and cannot.
@@ -372,13 +375,47 @@ export default function RecreateItemPage({
                 >
                   {JSON.stringify(payload, null, 2)}
                 </pre>
-                <Alert
-                  type="info"
-                  showIcon
-                  data-testid="not-submitted"
-                  title="Prepared, not submitted"
-                  description="The files are on disk and this is the payload a creator would receive. Nothing has been put on a queue yet."
-                />
+                {item?.status === 'submitted' ? (
+                  <Alert
+                    type="success"
+                    showIcon
+                    data-testid="submitted"
+                    title="Submitted to instacreator"
+                    description="The payload is on the queue. Resubmitting is safe — instacreator ignores a duplicate."
+                  />
+                ) : (
+                  <Alert
+                    type="info"
+                    showIcon
+                    data-testid="not-submitted"
+                    title="Prepared, not submitted"
+                    description="The files are on disk and this is the payload instacreator will receive."
+                  />
+                )}
+                <Flex gap={10} align="center">
+                  <Button
+                    type="primary"
+                    data-testid="submit-queue"
+                    loading={sending}
+                    onClick={async () => {
+                      setSending(true)
+                      setSendError(null)
+                      try {
+                        await submitRecreate(shortcode)
+                        await refresh()
+                      } catch (e) {
+                        setSendError(e instanceof Error ? e.message : String(e))
+                      } finally {
+                        setSending(false)
+                      }
+                    }}
+                  >
+                    {item?.status === 'submitted' ? 'Send again' : 'Send to instacreator'}
+                  </Button>
+                </Flex>
+                {sendError && (
+                  <Alert type="error" showIcon data-testid="submit-error" title="Could not submit" description={sendError} />
+                )}
               </Flex>
             ) : (
               phase !== 'error' && (

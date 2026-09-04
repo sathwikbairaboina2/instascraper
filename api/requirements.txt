@@ -6,3 +6,5 @@ pytest-asyncio==0.25.2
 httpx==0.28.1
 # Reel video only: Business Discovery serves a thumbnail and keeps the file.
 yt-dlp==2026.8.19
+# Publishes prepared recreate payloads to instacreator's SQS queue.
+boto3==1.43.81

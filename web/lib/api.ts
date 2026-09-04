@@ -215,6 +215,11 @@ export const unmarkRecreate = (shortcode: string) =>
   call<{ removed: number }>(`/api/recreate/${encodeURIComponent(shortcode)}`, {
     method: 'DELETE',
   })
+export const submitRecreate = (shortcode: string) =>
+  call<{ status: string; shortcode: string }>(
+    `/api/recreate/${encodeURIComponent(shortcode)}/submit`,
+    { method: 'POST' },
+  )
 export const prepareRecreate = (shortcode: string, slides: number[] | null) =>
   call<RecreatePayload>(`/api/recreate/${encodeURIComponent(shortcode)}/prepare`, {
     method: 'POST',

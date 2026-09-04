@@ -6,6 +6,10 @@ services:
       DB_PATH: /data/app.db
       MEDIA_DIR: /data/media
       OUT_DIR_CONTAINER: /out
+      # instacreator's ElasticMQ, published on the host at 24104. Empty
+      # disables the handoff and /api/recreate/{sc}/submit answers 503.
+      SQS_ENDPOINT: ${SQS_ENDPOINT:-http://host.docker.internal:24104}
+      SQS_QUEUE: recreate-jobs
     volumes:
       - ./data:/data
       - ${OUT_DIR:-./downloads}:/out
