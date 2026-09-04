@@ -1,0 +1,1730 @@
+<title>instascraper Field Manual</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Mono:wght@400;500;600&family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;1,7..72,400&display=swap">
+
+<style>
+/* ---------- tokens: light is the base, both dark paths redefine only these ---------- */
+:root{
+  --ground:#FAF9FC; --surface:#FFFFFF; --surface-2:#F3F1F7; --surface-3:#EDEAF3;
+  --ink:#1A1626; --ink-2:#4A4358; --muted:#736C82;
+  --line:#E4E0EC; --line-strong:#CFC8DC;
+  --accent:#B5306E; --accent-ink:#8E2456; --accent-soft:#F9E9F1;
+  --teal:#0E7C72; --teal-ink:#0B5F58; --teal-soft:#E1F1EF;
+  --ok:#2E7355; --warn:#8F5E00; --crit:#B3382C;
+  --ok-soft:#E4F1EA; --warn-soft:#F7EEDC; --crit-soft:#F8E7E4;
+  --code-bg:#F4F2F9; --shadow:0 1px 2px rgba(26,22,38,.06), 0 8px 24px rgba(26,22,38,.05);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#141019; --surface:#1C1725; --surface-2:#241E30; --surface-3:#2B2439;
+    --ink:#EFEBF5; --ink-2:#C7C0D4; --muted:#968EA6;
+    --line:#2E2740; --line-strong:#443A5B;
+    --accent:#F07CAC; --accent-ink:#F7A9C9; --accent-soft:#3B1F2E;
+    --teal:#57D0C1; --teal-ink:#82DED2; --teal-soft:#123330;
+    --ok:#67C398; --warn:#D9A441; --crit:#EF8073;
+    --ok-soft:#173026; --warn-soft:#332815; --crit-soft:#361F1C;
+    --code-bg:#221C2E; --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.28);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#141019; --surface:#1C1725; --surface-2:#241E30; --surface-3:#2B2439;
+  --ink:#EFEBF5; --ink-2:#C7C0D4; --muted:#968EA6;
+  --line:#2E2740; --line-strong:#443A5B;
+  --accent:#F07CAC; --accent-ink:#F7A9C9; --accent-soft:#3B1F2E;
+  --teal:#57D0C1; --teal-ink:#82DED2; --teal-soft:#123330;
+  --ok:#67C398; --warn:#D9A441; --crit:#EF8073;
+  --ok-soft:#173026; --warn-soft:#332815; --crit-soft:#361F1C;
+  --code-bg:#221C2E; --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.28);
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--ground); color:var(--ink);
+  font-family:"Literata", Georgia, "Times New Roman", serif;
+  font-size:16px; line-height:1.65; -webkit-font-smoothing:antialiased;
+}
+a{color:var(--accent-ink); text-decoration-thickness:1px; text-underline-offset:2px}
+a:hover{color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent); outline-offset:2px; border-radius:3px}
+code, kbd, pre, .mono{font-family:"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace}
+code{font-size:.86em; background:var(--code-bg); padding:.12em .36em; border-radius:4px; color:var(--ink-2)}
+pre{background:var(--code-bg); border:1px solid var(--line); border-radius:10px; padding:14px 16px; overflow-x:auto; font-size:13px; line-height:1.6; margin:0}
+pre code{background:none; padding:0; font-size:inherit; color:var(--ink)}
+
+/* ---------- shell ---------- */
+.shell{display:grid; grid-template-columns:264px minmax(0,1fr); gap:0; max-width:1360px; margin:0 auto}
+.rail{
+  position:sticky; top:0; align-self:start; height:100vh; overflow-y:auto;
+  border-right:1px solid var(--line); padding:28px 20px 40px; background:var(--ground);
+}
+.railmark{font-family:"Bricolage Grotesque", system-ui, sans-serif; font-weight:700; font-size:19px; letter-spacing:-.02em; margin:0 0 2px}
+.railsub{font-size:11.5px; color:var(--muted); letter-spacing:.06em; text-transform:uppercase; margin:0 0 22px}
+.railnav{display:flex; flex-direction:column; gap:1px}
+.railnav a{
+  display:block; padding:6px 10px; border-radius:7px; font-size:13.5px;
+  color:var(--ink-2); text-decoration:none; border-left:2px solid transparent;
+}
+.railnav a:hover{background:var(--surface-2); color:var(--ink)}
+.railnav a.on{background:var(--accent-soft); color:var(--accent-ink); border-left-color:var(--accent); font-weight:600}
+.railnav .sub{margin-left:12px; font-size:12.5px; color:var(--muted)}
+
+main{padding:0 40px 120px; min-width:0}
+section{padding-top:56px; scroll-margin-top:20px}
+.prose{max-width:68ch}
+h1,h2,h3,h4{font-family:"Bricolage Grotesque", system-ui, sans-serif; text-wrap:balance; margin:0}
+h1{font-size:clamp(34px,5vw,52px); font-weight:700; letter-spacing:-.035em; line-height:1.03}
+h2{font-size:29px; font-weight:700; letter-spacing:-.025em; margin-bottom:6px}
+h3{font-size:18.5px; font-weight:600; letter-spacing:-.012em; margin:30px 0 8px}
+h4{font-size:14.5px; font-weight:600; letter-spacing:-.005em; margin:20px 0 6px}
+p{margin:12px 0}
+.lede{font-size:19px; line-height:1.6; color:var(--ink-2)}
+.eyebrow{
+  font-family:"IBM Plex Mono", monospace; font-size:11px; letter-spacing:.16em;
+  text-transform:uppercase; color:var(--accent); margin:0 0 10px; font-weight:500;
+}
+.dim{color:var(--muted)}
+ul,ol{padding-left:1.15em; margin:12px 0}
+li{margin:5px 0}
+
+/* ---------- hero ---------- */
+.hero{padding:64px 0 8px; border-bottom:1px solid var(--line)}
+.hero .lede{max-width:60ch; margin-top:16px}
+.facts{display:flex; flex-wrap:wrap; gap:10px; margin:26px 0 30px; padding:0; list-style:none}
+.fact{
+  display:flex; flex-direction:column; gap:1px; padding:9px 14px; background:var(--surface);
+  border:1px solid var(--line); border-radius:10px; min-width:104px;
+}
+.fact b{font-family:"IBM Plex Mono", monospace; font-size:17px; font-weight:600; letter-spacing:-.01em; font-variant-numeric:tabular-nums}
+.fact span{font-size:11px; color:var(--muted); letter-spacing:.04em; text-transform:uppercase}
+
+/* ---------- generic blocks ---------- */
+.card{background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:18px 20px; box-shadow:var(--shadow)}
+.grid2{display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:14px; margin:20px 0}
+.note{
+  border-left:3px solid var(--teal); background:var(--teal-soft); border-radius:0 10px 10px 0;
+  padding:12px 16px; margin:20px 0; font-size:14.5px;
+}
+.note.warn{border-left-color:var(--warn); background:var(--warn-soft)}
+.note strong{font-family:"Bricolage Grotesque",system-ui,sans-serif}
+
+table{border-collapse:collapse; width:100%; font-size:14px; margin:0}
+.tablewrap{overflow-x:auto; border:1px solid var(--line); border-radius:12px; margin:20px 0; background:var(--surface)}
+th,td{text-align:left; padding:9px 14px; border-bottom:1px solid var(--line); vertical-align:top}
+th{
+  font-family:"IBM Plex Mono",monospace; font-size:11px; letter-spacing:.1em; text-transform:uppercase;
+  color:var(--muted); font-weight:500; background:var(--surface-2); white-space:nowrap;
+}
+tr:last-child td{border-bottom:none}
+td code{white-space:nowrap}
+.num{font-variant-numeric:tabular-nums}
+
+.pill{
+  display:inline-block; font-family:"IBM Plex Mono",monospace; font-size:10.5px; font-weight:600;
+  letter-spacing:.06em; text-transform:uppercase; padding:2px 7px; border-radius:5px; white-space:nowrap;
+}
+.pill.ok{background:var(--ok-soft); color:var(--ok)}
+.pill.warn{background:var(--warn-soft); color:var(--warn)}
+.pill.crit{background:var(--crit-soft); color:var(--crit)}
+.pill.neutral{background:var(--surface-3); color:var(--ink-2)}
+.pill.accent{background:var(--accent-soft); color:var(--accent-ink)}
+.pill.teal{background:var(--teal-soft); color:var(--teal-ink)}
+
+/* ---------- step flow ---------- */
+.steps{list-style:none; padding:0; margin:22px 0; counter-reset:step}
+.steps li{
+  position:relative; padding:0 0 20px 44px; margin:0;
+  border-left:1px solid var(--line-strong); counter-increment:step;
+}
+.steps li:last-child{border-left-color:transparent; padding-bottom:0}
+.steps li::before{
+  content:counter(step); position:absolute; left:-13px; top:-2px; width:26px; height:26px;
+  display:grid; place-items:center; border-radius:50%; background:var(--surface); border:1px solid var(--line-strong);
+  font-family:"IBM Plex Mono",monospace; font-size:11.5px; font-weight:600; color:var(--accent-ink);
+}
+.steps li h4{margin:0 0 2px}
+.steps li p{margin:2px 0; font-size:14.5px; color:var(--ink-2)}
+
+/* ---------- diagram ---------- */
+figure{margin:26px 0}
+figure svg{width:100%; height:auto; display:block}
+figcaption{font-size:13px; color:var(--muted); margin-top:10px; max-width:66ch}
+.dg-box{fill:var(--surface); stroke:var(--line-strong)}
+.dg-box-accent{fill:var(--accent-soft); stroke:var(--accent)}
+.dg-box-teal{fill:var(--teal-soft); stroke:var(--teal)}
+.dg-title{fill:var(--ink); font-family:"Bricolage Grotesque",system-ui,sans-serif; font-size:13px; font-weight:600}
+.dg-sub{fill:var(--muted); font-family:"IBM Plex Mono",monospace; font-size:10px}
+.dg-line{stroke:var(--line-strong); fill:none; stroke-width:1.5}
+.dg-line-accent{stroke:var(--accent); fill:none; stroke-width:1.5}
+.dg-label{fill:var(--muted); font-family:"IBM Plex Mono",monospace; font-size:9.5px}
+.dg-zone{fill:none; stroke:var(--line); stroke-width:1; stroke-dasharray:4 4}
+.dg-zone-label{fill:var(--muted); font-family:"IBM Plex Mono",monospace; font-size:9.5px; letter-spacing:.1em}
+
+/* ---------- api reference ---------- */
+.apibar{
+  display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:22px 0 14px;
+  position:sticky; top:0; padding:12px 0; background:var(--ground); z-index:5; border-bottom:1px solid var(--line);
+}
+.apibar input{
+  flex:1 1 200px; min-width:0; padding:8px 12px; border-radius:8px; border:1px solid var(--line-strong);
+  background:var(--surface); color:var(--ink); font-family:"IBM Plex Mono",monospace; font-size:13px;
+}
+.chip{
+  border:1px solid var(--line-strong); background:var(--surface); color:var(--ink-2);
+  font-family:"IBM Plex Mono",monospace; font-size:11.5px; padding:6px 11px; border-radius:999px; cursor:pointer;
+}
+.chip[aria-pressed="true"]{background:var(--accent-soft); border-color:var(--accent); color:var(--accent-ink); font-weight:600}
+.apicount{font-size:12.5px; color:var(--muted); font-variant-numeric:tabular-nums}
+
+.op{border:1px solid var(--line); border-radius:11px; background:var(--surface); margin-bottom:9px; overflow:hidden}
+.op[open]{border-color:var(--line-strong); box-shadow:var(--shadow)}
+.op summary{
+  display:flex; align-items:center; gap:12px; padding:11px 15px; cursor:pointer; list-style:none;
+}
+.op summary::-webkit-details-marker{display:none}
+.op summary:hover{background:var(--surface-2)}
+.verb{
+  font-family:"IBM Plex Mono",monospace; font-size:10.5px; font-weight:600; letter-spacing:.08em;
+  padding:3px 8px; border-radius:5px; min-width:58px; text-align:center;
+}
+.verb.get{background:var(--teal-soft); color:var(--teal-ink)}
+.verb.post{background:var(--ok-soft); color:var(--ok)}
+.verb.put{background:var(--warn-soft); color:var(--warn)}
+.verb.delete{background:var(--crit-soft); color:var(--crit)}
+.op .path{font-family:"IBM Plex Mono",monospace; font-size:13.5px; color:var(--ink); font-weight:500}
+.op .path em{font-style:normal; color:var(--accent-ink)}
+.op .blurb{font-size:13px; color:var(--muted); margin-left:auto; text-align:right; max-width:40%}
+.opbody{padding:4px 16px 18px; border-top:1px solid var(--line); font-size:14.5px}
+.opbody h5{
+  font-family:"IBM Plex Mono",monospace; font-size:10.5px; letter-spacing:.14em; text-transform:uppercase;
+  color:var(--muted); margin:18px 0 7px; font-weight:500;
+}
+.opbody p{margin:10px 0; color:var(--ink-2); max-width:68ch}
+.params{width:100%; font-size:13px}
+.params td{padding:6px 10px}
+.params td:first-child{white-space:nowrap}
+.req{color:var(--crit); font-size:10px; font-family:"IBM Plex Mono",monospace; letter-spacing:.06em}
+.errs{display:flex; flex-direction:column; gap:6px; margin:8px 0}
+.err{display:flex; gap:10px; align-items:baseline; font-size:13.5px}
+.err .code{font-family:"IBM Plex Mono",monospace; font-weight:600; color:var(--crit); min-width:34px}
+.spec-toggle{
+  margin-top:14px; font-family:"IBM Plex Mono",monospace; font-size:11.5px; color:var(--muted); cursor:pointer;
+}
+.spec-toggle summary{list-style:none; padding:0}
+.spec-toggle summary::-webkit-details-marker{display:none}
+.spec-toggle summary::before{content:"▸ "; color:var(--accent)}
+.spec-toggle[open] summary::before{content:"▾ "}
+.spec-toggle pre{margin-top:8px; font-size:11.5px; max-height:340px}
+
+footer{border-top:1px solid var(--line); margin-top:80px; padding:26px 0 0; font-size:13px; color:var(--muted)}
+
+@media (max-width:900px){
+  .shell{grid-template-columns:1fr}
+  .rail{position:static; height:auto; border-right:none; border-bottom:1px solid var(--line); padding:20px}
+  .railnav{flex-direction:row; flex-wrap:wrap}
+  .railnav .sub{display:none}
+  main{padding:0 20px 90px}
+  .op .blurb{display:none}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none !important; transition:none !important}}
+</style>
+
+<div class="shell">
+  <nav class="rail">
+    <p class="railmark">instascraper</p>
+    <p class="railsub">Field Manual</p>
+    <div class="railnav" id="railnav">
+      <a href="#overview">Overview</a>
+      <a href="#features">What it does</a>
+      <a href="#scope">Scope &amp; non-goals</a>
+      <a href="#walkthrough">Walkthrough</a>
+      <a href="#walkthrough" class="sub">Lookup → download</a>
+      <a href="#trending-flow" class="sub">Trending → queue</a>
+      <a href="#recreate-flow" class="sub">Recreate → prepare</a>
+      <a href="#architecture">Architecture</a>
+      <a href="#lifecycle" class="sub">Request lifecycle</a>
+      <a href="#worker" class="sub">The one worker</a>
+      <a href="#failure" class="sub">Failure taxonomy</a>
+      <a href="#adapters" class="sub">Adapters &amp; runtime</a>
+      <a href="#data">Data model</a>
+      <a href="#api">API reference</a>
+      <a href="#testing">Testing</a>
+      <a href="#config">Configuration</a>
+      <a href="#trouble">Troubleshooting</a>
+    </div>
+  </nav>
+
+  <main>
+
+  <!-- ============ HERO ============ -->
+  <header class="hero">
+    <p class="eyebrow">Local · single user · read only</p>
+    <h1>Look up a profile.<br>Keep what is worth keeping.</h1>
+    <p class="lede">
+      instascraper points at one public Instagram account, indexes what it published, and
+      pulls the media you pick into a folder on your own machine at full quality. It runs on
+      your laptop, talks to Meta through one credential, and never publishes anything back.
+    </p>
+    <ul class="facts">
+      <li class="fact"><b>23</b><span>endpoints</span></li>
+      <li class="fact"><b>338</b><span>backend tests</span></li>
+      <li class="fact"><b>91</b><span>e2e tests</span></li>
+      <li class="fact"><b>1</b><span>fetch thread</span></li>
+      <li class="fact"><b>0</b><span>write access to IG</span></li>
+    </ul>
+  </header>
+
+  <!-- ============ OVERVIEW ============ -->
+  <section id="overview">
+    <p class="eyebrow">Overview</p>
+    <h2>The whole idea in a minute</h2>
+    <div class="prose">
+      <p>
+        You type a username. The app asks Meta what that account has published, saves the
+        metadata and thumbnails locally, and draws a grid. Nothing full-resolution is fetched
+        yet — thumbnails are cheap, originals are not. You click the tiles you want, give them
+        a base filename, and press Download. The originals arrive, get cached forever, and get
+        copied into your output folder as <code>base_01.jpg</code>, <code>base_02.mp4</code>,
+        and so on.
+      </p>
+      <p>
+        Two facts shape every design decision in the codebase, and both are worth knowing before
+        you read another line.
+      </p>
+
+      <h3>Fact one: the API only sees business accounts</h3>
+      <p>
+        Data comes from Meta's <strong>Business Discovery</strong> API, which reads
+        <em>public Business and Creator accounts only</em>. Personal accounts are invisible to
+        it. That is a property of the API, not a gap in this app, and no workaround exists.
+        Business Discovery also has no per-media endpoint: a media URL exists only inside a
+        listing response, and those URLs expire — which is why re-listing a profile is a
+        first-class recovery path rather than an edge case.
+      </p>
+
+      <h3>Fact two: exactly one thread talks to Instagram</h3>
+      <p>
+        The API process runs uvicorn with <code>--workers 1</code>: an HTTP event loop plus
+        exactly one background fetch thread. That thread is the only code in the system
+        permitted to make an Instagram-bound request. Serialization is therefore
+        <em>structural</em> — not a convention someone has to remember. Everything else — the
+        rate pacer, the circuit breaker, the job queue, the local reel budget — hangs off that
+        single choke point.
+      </p>
+
+      <div class="note">
+        <strong>Blast radius.</strong> All Meta Graph usage lives in <code>api/app/ig/</code>.
+        When Instagram reshapes a response, exactly one file needs changing:
+        <code>api/app/ig/graph_map.py</code>. A live canary test exists to tell you when that
+        day has arrived.
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ FEATURES ============ -->
+  <section id="features">
+    <p class="eyebrow">What it does</p>
+    <h2>Feature map</h2>
+    <p class="prose dim">Every capability the app ships today, and where it lives.</p>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Feature</th><th>What you get</th><th>Where</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><strong>Profile lookup</strong></td>
+            <td>Type a username; the app queues a sync, fetches profile metadata, caches the
+              avatar, and indexes the first page of posts.</td>
+            <td><code>/</code> → <code>/p/{username}</code></td>
+          </tr>
+          <tr>
+            <td><strong>Media grid</strong></td>
+            <td>Newest-first responsive tiles with cached thumbnails, post kind, engagement
+              counts and cache state per tile.</td>
+            <td><code>/p/{username}</code></td>
+          </tr>
+          <tr>
+            <td><strong>Tabs</strong></td>
+            <td>Posts · Reels · Saved · Recreate. Saved means "already downloaded"; Recreate
+              means "on the remake queue". Both are ours, not Instagram's.</td>
+            <td><code>lib/useFilters.ts</code></td>
+          </tr>
+          <tr>
+            <td><strong>Filters</strong></td>
+            <td>Caption search, cached-only toggle, live match count, one-click reset.</td>
+            <td><code>lib/useFilters.ts</code></td>
+          </tr>
+          <tr>
+            <td><strong>Selection</strong></td>
+            <td>Click to toggle, shift-click for a range, select-all across what is visible.</td>
+            <td><code>lib/useSelection.ts</code></td>
+          </tr>
+          <tr>
+            <td><strong>Saved selections</strong></td>
+            <td>Name a selection and reload it later. Per profile, per browser
+              (<code>localStorage</code>) — a convenience, not shared state.</td>
+            <td><code>lib/savedSelections.ts</code></td>
+          </tr>
+          <tr>
+            <td><strong>Download</strong></td>
+            <td>Full-resolution originals under a base filename you choose, written
+              individually — never zipped. Carousels get letter suffixes.</td>
+            <td><code>POST /api/downloads</code></td>
+          </tr>
+          <tr>
+            <td><strong>Lightbox &amp; slide preview</strong></td>
+            <td>Open a post before spending a download: single images and carousel slides
+              stream straight from Meta's CDN via a redirect.</td>
+            <td><code>GET /api/media/{sc}/preview</code></td>
+          </tr>
+          <tr>
+            <td><strong>Paging</strong></td>
+            <td>"Load more" walks the profile one Graph page deeper and stops permanently once
+              the account is exhausted.</td>
+            <td><code>POST …/load-more</code></td>
+          </tr>
+          <tr>
+            <td><strong>Tracked profiles</strong></td>
+            <td>Pin the accounts you keep coming back to; they show in the sidebar with their
+              last sync time.</td>
+            <td><code>PUT …/tracked</code></td>
+          </tr>
+          <tr>
+            <td><strong>Trending hashtags</strong></td>
+            <td>Ranks the tags in your cached captions over a 24-hour and 7-day window, scored
+              by real engagement. Expand a tag to see its posts.</td>
+            <td><code>/trending</code></td>
+          </tr>
+          <tr>
+            <td><strong>Recreate queue</strong></td>
+            <td>Mark posts worth remaking. Each entry is a snapshot, so clearing a cache cannot
+              silently delete queued work.</td>
+            <td><code>/recreate</code></td>
+          </tr>
+          <tr>
+            <td><strong>Prepare payload</strong></td>
+            <td>Turn a queued post into a handoff payload built from files actually on disk —
+              paths, MIME, byte size, pixel dimensions.</td>
+            <td><code>POST …/prepare</code></td>
+          </tr>
+          <tr>
+            <td><strong>Activity log</strong></td>
+            <td>Who did what, when: lookups, load-mores, track/untrack, downloads with file
+              counts and destination.</td>
+            <td><code>/activity</code></td>
+          </tr>
+          <tr>
+            <td><strong>Live status header</strong></td>
+            <td>Worker state, queue depth, Meta quota percentage, reel budget countdown, and a
+              banner when the breaker trips. Polls every 5s.</td>
+            <td><code>GET /api/status</code></td>
+          </tr>
+          <tr>
+            <td><strong>Adapter toggle</strong></td>
+            <td>Switch between real Graph data and a seeded offline dataset at runtime. Each
+              keeps its own database and media cache.</td>
+            <td><code>POST /api/adapter</code></td>
+          </tr>
+          <tr>
+            <td><strong>Reel video fallback</strong></td>
+            <td>Business Discovery serves a reel's thumbnail but never its video, so reels fall
+              back to a hard-capped, paced <code>yt-dlp</code> path.</td>
+            <td><code>api/app/ig/reels.py</code></td>
+          </tr>
+          <tr>
+            <td><strong>Crash recovery</strong></td>
+            <td>On boot, half-written <code>.part</code> files are deleted and any job or item
+              left mid-flight is returned to the queue.</td>
+            <td><code>api/app/worker/sweep.py</code></td>
+          </tr>
+          <tr>
+            <td><strong>Health canary</strong></td>
+            <td>One call proves profile → page → media still works end to end against the real
+              API. Shared by the endpoint and the live test.</td>
+            <td><code>GET /api/health/canary</code></td>
+          </tr>
+          <tr>
+            <td><strong>Dark / light theme</strong></td>
+            <td>Ant Design tokens driven by a stored preference, applied across every page.</td>
+            <td><code>components/ThemeProvider.tsx</code></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============ SCOPE ============ -->
+  <section id="scope">
+    <p class="eyebrow">Scope &amp; non-goals</p>
+    <h2>What this is, and what it deliberately is not</h2>
+
+    <div class="grid2">
+      <div class="card">
+        <h4 style="margin-top:0">In scope</h4>
+        <ul style="font-size:14.5px">
+          <li>Public <strong>Business</strong> and <strong>Creator</strong> accounts</li>
+          <li>Reading metadata, thumbnails and originals</li>
+          <li>Individual downloads at maximum available quality</li>
+          <li>Reels with their audio intact</li>
+          <li>A local record of tracked profiles and of every action taken</li>
+          <li>One machine, one user, one credential</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4 style="margin-top:0">Out of scope</h4>
+        <ul style="font-size:14.5px">
+          <li>Private accounts, and personal accounts of any kind</li>
+          <li>Publishing, scheduling, or any write access to Instagram</li>
+          <li>Unattended bulk-archiving of an account's full history</li>
+          <li>Per-user Instagram logins or a multi-tenant deployment</li>
+          <li>ZIP bundles — files are written individually, by design</li>
+          <li>Stories, highlights, comments, DMs</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="note warn">
+      <strong>Known limits, stated plainly.</strong> View counts exist on reels and nowhere else,
+      so reels weigh more heavily in any engagement total. The trending day window is only as
+      full as your cache — if nothing published in the last 24 hours has been synced, the feed is
+      empty and says so. And the reel video path is the one place the app touches
+      instagram.com directly; it is capped at 20/hour and 100/day on purpose.
+    </div>
+  </section>
+
+  <!-- ============ WALKTHROUGH ============ -->
+  <section id="walkthrough">
+    <p class="eyebrow">Walkthrough</p>
+    <h2>Lookup to download, click by click</h2>
+    <p class="prose dim">
+      The main flow. Everything below happens in one browser tab — keep it open while a download
+      runs, because the browser drives the loop.
+    </p>
+
+    <ol class="steps">
+      <li>
+        <h4>Type a username on the home screen</h4>
+        <p>One input, one button. Recently tracked profiles sit underneath as one-click
+          suggestions. Pressing Enter fires <code>POST /api/profiles/{u}/sync</code>, writes a
+          <code>lookup</code> row into the activity log, wakes the worker, and routes you to
+          <code>/p/{username}</code>.</p>
+      </li>
+      <li>
+        <h4>The profile page opens before the data exists</h4>
+        <p>You land on a loading state, not an error. The page polls until the sync lands, then
+          swaps in the header: avatar, full name, biography, follower and post counts, last sync
+          time, and how many posts are already cached locally.</p>
+        <p class="dim">A private account gets its own explicit state — the app tells you the
+          account is out of reach rather than showing an empty grid.</p>
+      </li>
+      <li>
+        <h4>Behind the scenes, the worker walks the profile</h4>
+        <p><code>profile_sync</code> fetches metadata and the avatar, then enqueues
+          <code>page_fetch</code>. The first page is small (12 posts — enough to fill one screen)
+          and every later page is 36. Each post's metadata, engagement counts, source URLs and
+          thumbnail land in SQLite and on disk.</p>
+      </li>
+      <li>
+        <h4>Browse the grid</h4>
+        <p>Tiles are newest-first. Switch tabs — <span class="pill neutral">Posts</span>
+          <span class="pill neutral">Reels</span> <span class="pill neutral">Saved</span>
+          <span class="pill neutral">Recreate</span> — search captions, or flip on
+          <em>cached only</em>. A match count and a reset button appear whenever a filter is
+          active, so you always know why a tile is missing.</p>
+      </li>
+      <li>
+        <h4>Open a tile to look closer, without spending a download</h4>
+        <p>The lightbox streams the original from Meta's CDN through
+          <code>/api/media/{shortcode}/preview</code>, one slide at a time for a carousel. This
+          is a 307 redirect on purpose: an expired URL fails as a broken image you can fall back
+          from, never as a cached wrong answer.</p>
+      </li>
+      <li>
+        <h4>Select what you want</h4>
+        <p>Click to toggle, shift-click to take a range, or select every visible tile. The
+          selection bar counts what you picked and lets you name and save the set for later.</p>
+      </li>
+      <li>
+        <h4>Name the batch and press Download</h4>
+        <p>The browser calls <code>POST /api/media/ensure</code> first, which queues whatever
+          is not yet cached and reports a per-shortcode status. It polls until everything reads
+          <span class="pill ok">ready</span>, showing progress as it goes, then calls
+          <code>POST /api/downloads</code>.</p>
+      </li>
+      <li>
+        <h4>Files land in your output folder</h4>
+        <p>Ordered oldest-first, so the numbering reads chronologically — the opposite of the
+          grid, deliberately. Singles become <code>base_01.jpg</code>; carousel slides become
+          <code>base_07a.jpg</code>, <code>base_07b.jpg</code>. A name collision gets a
+          <code>-1</code> suffix rather than an overwrite. The download is recorded in the
+          activity log with its file count and destination.</p>
+      </li>
+    </ol>
+
+    <div class="note">
+      <strong>Close the tab mid-run?</strong> Nothing is lost. Media already fetched stays cached
+      forever, so re-selecting the same posts finishes immediately.
+    </div>
+
+    <h3 id="trending-flow">Trending → recreate queue</h3>
+    <ol class="steps">
+      <li>
+        <h4>Open Trending</h4>
+        <p>The feed ranks every hashtag in your <em>cached</em> captions. Nothing here touches
+          Instagram: it is a read-only view over what a sync already brought in.</p>
+      </li>
+      <li>
+        <h4>Pick a window</h4>
+        <p><span class="pill accent">Day</span> covers the last 24 hours,
+          <span class="pill accent">Week</span> the last 7 days. Switching re-queries rather
+          than re-filtering, so the score is always computed over exactly the window shown.</p>
+      </li>
+      <li>
+        <h4>Read the score honestly</h4>
+        <p>A tag's score is the likes, comments and views of every cached post carrying it,
+          added together — so a tag several decent posts share outranks one that rode a single
+          hit. Ties break on post count, then alphabetically, which keeps offset paging stable.</p>
+      </li>
+      <li>
+        <h4>Expand a row</h4>
+        <p>The posts behind that tag load as thumbnails, newest first. Ones already on the
+          recreate queue are labelled <em>queued</em>. Pick any of them and send the batch to the
+          queue; the local selection is scratch and is thrown away when the row closes.</p>
+      </li>
+    </ol>
+
+    <h3 id="recreate-flow">Recreate → prepare</h3>
+    <ol class="steps">
+      <li>
+        <h4>The queue lists what you marked</h4>
+        <p>Split by status: <span class="pill neutral">selected</span> and
+          <span class="pill teal">prepared</span>. Each row is a snapshot taken at the moment
+          you marked it — username, permalink and caption — so clearing a profile's cache can
+          never quietly delete queued work.</p>
+      </li>
+      <li>
+        <h4>Open one to choose slides</h4>
+        <p>A single post has no choice to make. A carousel shows a slide picker; the default is
+          all of it. Downloaded slides render from disk, the rest from the CDN preview.</p>
+      </li>
+      <li>
+        <h4>Press Submit to build the payload</h4>
+        <p>Every path in the result is read out of <code>media_files</code>, so a payload can
+          never name a file that was never downloaded. A post that is not downloaded yet gets a
+          <span class="pill crit">409</span> telling you to fetch it first.</p>
+      </li>
+      <li>
+        <h4>Prepared, not submitted</h4>
+        <p>The payload is shown in full, and the page says outright that nothing has been handed
+          to a generator — because no generator exists yet. The word "submitted" is reserved for
+          the day a handoff actually happens.</p>
+      </li>
+    </ol>
+
+    <h3>The header, always on</h3>
+    <p class="prose">
+      Every page carries the same shell: search, navigation, tracked profiles, the recreate queue
+      badge, a theme switch, and a live status strip polling <code>/api/status</code> every five
+      seconds. It shows the worker state and queue depth, Meta's reported quota percentage, your
+      remaining reel budget with a countdown to reset, and — when something has gone wrong — one
+      of three banners.
+    </p>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Banner</th><th>Means</th><th>What to do</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><span class="pill warn">Rate limited</span></td>
+            <td>The worker paused itself after a 429, or because Meta's usage counter crossed
+              your ceiling.</td>
+            <td>Nothing. It resumes on its own, and the banner counts down.</td>
+          </tr>
+          <tr>
+            <td><span class="pill crit">Token invalid</span></td>
+            <td>The token expired or was revoked. The breaker tripped <em>permanently</em> — it
+              will not retry past a challenge on its own.</td>
+            <td>Issue a new token, update <code>.env</code>, restart, then press
+              <em>I have fixed it</em>.</td>
+          </tr>
+          <tr>
+            <td><span class="pill crit">Token not configured</span></td>
+            <td><code>IG_GRAPH_TOKEN</code> is empty.</td>
+            <td>Fill in the credentials — see <a href="#config">Configuration</a>.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============ ARCHITECTURE ============ -->
+  <section id="architecture">
+    <p class="eyebrow">Architecture</p>
+    <h2>Two processes, one thread that matters</h2>
+    <p class="prose">
+      <code>web</code> is Next.js 15 with the App Router; it serves the UI and rewrites
+      <code>/api/*</code> to <code>api</code>, so the browser only ever sees one origin.
+      <code>api</code> is FastAPI on uvicorn with a single worker process. Inside it: the HTTP
+      event loop, a SQLite database in WAL mode, and one daemon thread named
+      <code>ig-worker</code>.
+    </p>
+
+    <figure>
+      <svg viewBox="0 0 900 470" role="img" aria-labelledby="archtitle">
+        <title id="archtitle">Architecture: browser through Next.js to FastAPI, SQLite, and a single fetch worker reaching Meta</title>
+
+        <!-- zones -->
+        <rect class="dg-zone" x="14" y="86" width="322" height="368" rx="10"/>
+        <text class="dg-zone-label" x="26" y="104">WEB CONTAINER · NEXT.JS</text>
+        <rect class="dg-zone" x="352" y="86" width="534" height="368" rx="10"/>
+        <text class="dg-zone-label" x="364" y="104">API CONTAINER · UVICORN, WORKERS=1</text>
+
+        <!-- browser -->
+        <rect class="dg-box-accent" x="34" y="18" width="200" height="46" rx="9"/>
+        <text class="dg-title" x="50" y="40">Browser</text>
+        <text class="dg-sub" x="50" y="55">polls /api/status every 5s</text>
+
+        <!-- next -->
+        <rect class="dg-box" x="34" y="126" width="282" height="62" rx="9"/>
+        <text class="dg-title" x="50" y="150">App Router pages</text>
+        <text class="dg-sub" x="50" y="166">/ · /p/[username] · /trending</text>
+        <text class="dg-sub" x="50" y="180">/recreate · /activity</text>
+
+        <rect class="dg-box" x="34" y="210" width="282" height="52" rx="9"/>
+        <text class="dg-title" x="50" y="234">rewrites /api/* → API_ORIGIN</text>
+        <text class="dg-sub" x="50" y="250">one origin, no CORS</text>
+
+        <!-- fastapi -->
+        <rect class="dg-box" x="374" y="126" width="228" height="62" rx="9"/>
+        <text class="dg-title" x="390" y="150">FastAPI event loop</text>
+        <text class="dg-sub" x="390" y="166">8 routers · 23 endpoints</text>
+        <text class="dg-sub" x="390" y="180">one connection per request</text>
+
+        <!-- sqlite -->
+        <rect class="dg-box-teal" x="374" y="222" width="228" height="60" rx="9"/>
+        <text class="dg-title" x="390" y="246">SQLite · WAL</text>
+        <text class="dg-sub" x="390" y="262">profiles · media_items · jobs</text>
+        <text class="dg-sub" x="390" y="276">media_files · activity · quota</text>
+
+        <!-- worker -->
+        <rect class="dg-box-accent" x="642" y="126" width="222" height="76" rx="9"/>
+        <text class="dg-title" x="658" y="150">ig-worker thread</text>
+        <text class="dg-sub" x="658" y="166">claim → pace → handle</text>
+        <text class="dg-sub" x="658" y="180">breaker gate on every loop</text>
+        <text class="dg-sub" x="658" y="194">the only IG-bound caller</text>
+
+        <!-- adapter -->
+        <rect class="dg-box" x="642" y="228" width="222" height="54" rx="9"/>
+        <text class="dg-title" x="658" y="250">Adapter · app/ig/</text>
+        <text class="dg-sub" x="658" y="266">graph | fake</text>
+
+        <!-- disk -->
+        <rect class="dg-box-teal" x="374" y="316" width="228" height="60" rx="9"/>
+        <text class="dg-title" x="390" y="340">Media cache</text>
+        <text class="dg-sub" x="390" y="356">data/media/&lt;user&gt;/&lt;shortcode&gt;/</text>
+        <text class="dg-sub" x="390" y="370">thumb.jpg · full*.jpg|mp4</text>
+
+        <rect class="dg-box" x="642" y="316" width="222" height="60" rx="9"/>
+        <text class="dg-title" x="658" y="340">OUT_DIR</text>
+        <text class="dg-sub" x="658" y="356">base_01.jpg · base_07a.jpg</text>
+        <text class="dg-sub" x="658" y="370">atomic copy, never zipped</text>
+
+        <!-- external -->
+        <rect class="dg-box" x="642" y="404" width="222" height="40" rx="9"/>
+        <text class="dg-title" x="658" y="422">graph.facebook.com</text>
+        <text class="dg-sub" x="658" y="436">+ CDN · + instagram.com (reels only)</text>
+
+        <!-- links -->
+        <path class="dg-line-accent" d="M134 64 L134 126"/>
+        <text class="dg-label" x="142" y="82">HTTP</text>
+        <path class="dg-line" d="M175 188 L175 210"/>
+        <path class="dg-line-accent" d="M316 236 L374 236 L374 188"/>
+        <text class="dg-label" x="322" y="228">proxy</text>
+        <path class="dg-line" d="M488 188 L488 222"/>
+        <path class="dg-line" d="M602 252 L622 252 L622 164 L642 164"/>
+        <text class="dg-label" x="600" y="200">jobs</text>
+        <path class="dg-line" d="M753 202 L753 228"/>
+        <path class="dg-line" d="M753 282 L753 316"/>
+        <path class="dg-line" d="M642 255 L618 255 L618 346 L602 346"/>
+        <path class="dg-line-accent" d="M864 255 L884 255 L884 424 L864 424"/>
+        <text class="dg-label" x="800" y="300">paced 3s</text>
+        <path class="dg-line" d="M488 282 L488 316"/>
+      </svg>
+      <figcaption>
+        Every arrow into Meta starts at one thread. The pacer, the breaker and the reel budget
+        all sit on that single edge, which is why a rate limit is something the system can
+        actually honour rather than merely intend.
+      </figcaption>
+    </figure>
+
+    <h3 id="lifecycle">Request lifecycle</h3>
+    <p class="prose">Two shapes of request, and the distinction matters.</p>
+
+    <div class="grid2">
+      <div class="card">
+        <h4 style="margin-top:0"><span class="pill teal">Read</span> answered immediately</h4>
+        <p style="font-size:14.5px; margin-bottom:0">
+          Grid, trending, activity, status, thumbnails. The endpoint opens its own SQLite
+          connection, reads, closes. Nothing queues, nothing waits on Instagram, and the
+          response is entirely from local state.
+        </p>
+      </div>
+      <div class="card">
+        <h4 style="margin-top:0"><span class="pill accent">Fetch</span> answered with a promise</h4>
+        <p style="font-size:14.5px; margin-bottom:0">
+          Sync, load-more, ensure. The endpoint writes a job row, wakes the worker, and returns
+          straight away. The browser polls to watch state change. No HTTP request ever blocks on
+          a network call to Meta.
+        </p>
+      </div>
+    </div>
+
+    <h3 id="worker">The one worker</h3>
+    <p class="prose">
+      The loop is small enough to state completely: check the breaker; claim the highest-priority
+      queued job in a <code>BEGIN IMMEDIATE</code> transaction; run its handler; record the
+      outcome as one line of JSON. If nothing is queued it sleeps on an event with a 5-second
+      timeout, so an enqueue wakes it instantly and a missed wake costs five seconds, not a
+      stall.
+    </p>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Job</th><th>Priority</th><th>Does</th><th>Then</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><code>media_fetch</code></td><td class="num">10</td>
+            <td>Downloads the originals for one post; falls back to the reel path when Meta
+              publishes no file.</td>
+            <td>Marks the item <span class="pill ok">ready</span>, or
+              <span class="pill crit">failed</span> with the reason.</td>
+          </tr>
+          <tr>
+            <td><code>profile_sync</code></td><td class="num">20</td>
+            <td>Fetches profile metadata and the avatar.</td>
+            <td>Enqueues <code>page_fetch</code> unless a walk is already part-way through.</td>
+          </tr>
+          <tr>
+            <td><code>page_fetch</code></td><td class="num">30</td>
+            <td>Fetches one Graph page, upserts every post, caches missing thumbnails.</td>
+            <td>Stores the next cursor — or an empty string, which means exhausted forever.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="prose dim" style="font-size:14px">
+      Lower number wins. A download you asked for is always served before background indexing,
+      which is the ordering a person waiting at a screen would choose.
+    </p>
+
+    <h4>Three independent brakes</h4>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Brake</th><th>Enforces</th><th>Default</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Graph pacer</strong></td><td>Floor on the gap between Graph API calls.</td><td class="num">3s</td></tr>
+          <tr><td><strong>CDN pacer</strong></td><td>Floor between thumbnail and avatar fetches. These do not spend Meta's quota, so this is politeness rather than defence.</td><td class="num">0.5s</td></tr>
+          <tr><td><strong>Usage guard</strong></td><td>Refuses to spend a call once the peak <code>x-app-usage</code> reading crosses your ceiling. Peak, not latest — the hourly window resets, and a number that only climbs stops being true.</td><td class="num">90%</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h4>The circuit breaker</h4>
+    <p class="prose">
+      One global gate, with two very different modes. A <strong>temporary</strong> trip is a
+      timed nap, taken after a rate limit, and expires on its own — the wait is
+      <code>max(IG_BACKOFF, whatever Meta estimated)</code>, because coming back sooner than
+      asked is how a rate limit becomes a blocked IP. A <strong>permanent</strong> trip follows a
+      login challenge or a dead token and never expires by itself; automatically retrying past a
+      challenge is how a throttled account becomes a flagged one. Clearing it is a deliberate
+      human act: <code>POST /api/health/clear-breaker</code>, which is what the banner button
+      calls.
+    </p>
+
+    <h4>The local reel budget</h4>
+    <p class="prose">
+      Business Discovery publishes a reel's thumbnail and keeps the video, so reel video is the
+      one thing fetched from instagram.com directly, through <code>yt-dlp</code>. That path has
+      its own ledger in <code>quota_events</code>: 20 per hour, 100 per day, a 20-second floor
+      between calls and a 120-second timeout. Because we own the ledger, the reset time is a fact
+      rather than an estimate — which is why the header can show a real countdown here and cannot
+      for Meta's quota. Checking the cap and recording the attempt happen in one indivisible
+      step, so two callers cannot both see the last slot as free. There is deliberately no
+      user-agent rotation and no randomised "human" sleeps: Instagram fingerprints request
+      patterns, not headers, so disguise buys exposure without protection. The honest lever is
+      doing less.
+    </p>
+
+    <h3 id="failure">Failure taxonomy</h3>
+    <p class="prose">
+      Every adapter failure is mapped onto one of six cases before it reaches the worker. The
+      mapping is the whole point: a rate limit, a dead post and a network blip call for opposite
+      responses, and one generic error would make them look alike.
+    </p>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Raised</th><th>Cause</th><th>Job</th><th>Breaker</th></tr></thead>
+        <tbody>
+          <tr><td><code>IgRateLimited</code></td><td>429 or a throttling code from Meta</td><td>Requeued without spending an attempt</td><td><span class="pill warn">temporary</span></td></tr>
+          <tr><td><code>IgChallenge</code></td><td>Dead or revoked token, login challenge</td><td>Requeued</td><td><span class="pill crit">permanent</span></td></tr>
+          <tr><td><code>IgQuotaSpent</code></td><td>Our own reel cap, not Meta's</td><td><span class="pill crit">failed</span>, terminal</td><td>untouched — backing off Graph would punish the one path behaving</td></tr>
+          <tr><td><code>IgNotFound</code></td><td>Profile or post does not exist</td><td><span class="pill crit">failed</span>, terminal</td><td>untouched</td></tr>
+          <tr><td><code>IgPrivate</code></td><td>Exists, but not a public Business account</td><td><span class="pill crit">failed</span>, terminal</td><td>untouched</td></tr>
+          <tr><td><code>IgTransient</code></td><td>Network blip, 5xx, unclassified</td><td>Retried, up to 3 attempts</td><td>untouched</td></tr>
+          <tr><td><em>anything else</em></td><td>A bug</td><td><span class="pill crit">failed</span>, logged with a traceback</td><td>untouched — a bug must not kill the worker</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note">
+      <strong>Secrets never travel.</strong> The token goes in an <code>Authorization</code>
+      header, never a query string, because a URL ends up in exception text, the JSON logs and
+      the activity table. Every error message is passed through a redactor before it is stored
+      or raised.
+    </div>
+
+    <h3 id="adapters">Adapters and the runtime switch</h3>
+    <p class="prose">
+      One interface, <code>IgAdapter</code>: <code>fetch_profile</code>, <code>fetch_page</code>,
+      <code>fetch_media</code>, <code>download_to</code>, <code>login</code>. Two implementations
+      satisfy it — <code>graph</code>, which talks to Meta, and <code>fake</code>, which serves a
+      deterministic in-memory dataset with no network at all. A contract test runs the same
+      assertions against both, so the fake cannot quietly drift from the real one.
+    </p>
+    <p class="prose">
+      Switching adapters at runtime swaps a single frozen triple — name, settings, adapter — in
+      one assignment, so there is no window where the adapter is already fake while the paths
+      still address the real database. The fake adapter's database and media cache are nested
+      under a <code>fake/</code> directory, so isolation is enforced by the filesystem rather
+      than by every query remembering to filter. Your <code>OUT_DIR</code> is deliberately
+      untouched: it holds files you named. Everything that can fail happens before the swap, and
+      the choice is persisted last — to <code>adapter.state</code> beside the database, not a
+      row inside it, since you cannot know which database to open until you have read the
+      selection.
+    </p>
+
+    <h4>On-disk layout</h4>
+<pre><code>data/
+  adapter.state              which adapter is live
+  app.db                     graph dataset
+  media/&lt;username&gt;/
+    avatar.jpg
+    &lt;shortcode&gt;/
+      thumb.jpg
+      full.jpg               single post
+      full_1.jpg full_2.jpg  carousel children
+  fake/
+    app.db                   fake dataset, fully isolated
+    media/...
+downloads/                   OUT_DIR — what you asked for, named how you asked</code></pre>
+    <p class="prose dim" style="font-size:14px">
+      Every write is atomic: bytes go to <code>name.part</code>, get <code>fsync</code>'d, then
+      <code>os.replace</code> onto the final path. A process killed mid-fetch leaves a
+      <code>.part</code> file and no half-valid cache entry, and the boot sweep deletes it.
+    </p>
+  </section>
+
+  <!-- ============ DATA MODEL ============ -->
+  <section id="data">
+    <p class="eyebrow">Data model</p>
+    <h2>Seven tables, one SQLite file</h2>
+    <p class="prose">
+      WAL journal, foreign keys on, a 5-second busy timeout. Requests get a fresh connection
+      each; the worker keeps a long-lived one cached per thread and keyed by path, so an adapter
+      switch cannot leave it writing to the database it started with. Schema changes that add
+      columns run through an idempotent migration, because SQLite has no
+      <code>ADD COLUMN IF NOT EXISTS</code>.
+    </p>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Table</th><th>Holds</th><th>Notable columns</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><code>profiles</code></td>
+            <td>One row per account ever looked up.</td>
+            <td><code>next_cursor</code> — <code>NULL</code> means nothing indexed yet,
+              <code>""</code> means exhausted forever; <code>tracked</code>,
+              <code>avatar_path</code>, <code>last_synced_at</code></td>
+          </tr>
+          <tr>
+            <td><code>media_items</code></td>
+            <td>One row per post, keyed by shortcode.</td>
+            <td><code>kind</code> (image · video · reel · carousel), <code>taken_at</code>,
+              <code>caption</code>, <code>like_count</code>, <code>comments_count</code>,
+              <code>view_count</code>, <code>full_status</code>, <code>src_urls</code></td>
+          </tr>
+          <tr>
+            <td><code>media_files</code></td>
+            <td>One row per file on disk, unique on (shortcode, role, child).</td>
+            <td><code>role</code> = thumb | full, <code>child_idx</code>, <code>path</code>,
+              <code>mime</code>, <code>bytes</code>, <code>width</code>, <code>height</code></td>
+          </tr>
+          <tr>
+            <td><code>jobs</code></td>
+            <td>The work queue itself.</td>
+            <td><code>kind</code>, <code>payload</code> (JSON, sorted keys — which is what makes
+              deduplication work), <code>priority</code>, <code>status</code>,
+              <code>attempts</code></td>
+          </tr>
+          <tr>
+            <td><code>activity_log</code></td>
+            <td>Every action, newest first.</td>
+            <td><code>action</code> = lookup · load_more · track · untrack · download,
+              <code>target</code>, <code>detail</code> (JSON)</td>
+          </tr>
+          <tr>
+            <td><code>quota_events</code></td>
+            <td>Our own reel ledger. Rows older than 7 days are pruned on write.</td>
+            <td><code>kind</code>, <code>at</code></td>
+          </tr>
+          <tr>
+            <td><code>recreate_items</code></td>
+            <td>Posts lined up to be remade. A snapshot, not a view.</td>
+            <td><code>status</code> = selected | prepared, <code>slides</code>,
+              <code>payload</code>, <code>prepared_at</code></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h4>The status a tile shows</h4>
+    <p class="prose">
+      <code>media_items.full_status</code> is the single source of truth behind every tile
+      badge, every progress bar and every retry button.
+    </p>
+<pre><code>none ──ensure──▶ queued ──worker claims──▶ fetching ──▶ ready
+                                                └──▶ failed ──retry──▶ queued
+                                                └──▶ quota   (reel cap spent; refused at the click,
+                                                              never queued against a spent budget)
+
+boot sweep: queued|fetching ──▶ none      running jobs ──▶ queued      *.part ──▶ deleted</code></pre>
+
+    <h4>How trending is computed</h4>
+    <p class="prose">
+      Nothing is stored. The window in front of every query bounds the scan to recent posts, and
+      the functions are pure enough that a materialised index could be slid underneath them if
+      that ever stops being cheap.
+    </p>
+    <ul class="prose">
+      <li>A <code>#</code> counts at the start of a caption or after whitespace, and nowhere
+        else — otherwise <code>example.com/#anchor</code> becomes a trending tag.</li>
+      <li>The tag body is taken by Unicode category (letters, numbers, marks, connector
+        punctuation), not by <code>\w</code>. <code>\w</code> excludes combining marks, which
+        cuts a Devanagari tag at its first vowel sign and quietly makes the whole feature
+        Latin-only.</li>
+      <li>Tags are <code>casefold</code>ed, not lowercased, so Greek <em>ΚΌΣΜΟΣ</em>,
+        <em>κόσμος</em> and <em>κόσμοσ</em> are one tag rather than three.</li>
+      <li>Tags are deduplicated <em>per post</em>: a caption repeating <code>#sale</code> three
+        times should not outrank a post people actually engaged with.</li>
+      <li><code>score = likes + comments + views</code>, summed over every cached post in the
+        window, nulls counted as zero.</li>
+      <li>Sorted by score, then post count, then tag — three keys, because offset paging with a
+        partial order makes pages repeat or drop rows.</li>
+    </ul>
+  </section>
+
+  <!-- ============ API ============ -->
+  <section id="api">
+    <p class="eyebrow">API reference</p>
+    <h2>Every endpoint</h2>
+    <p class="prose">
+      Generated from the live OpenAPI schema that FastAPI publishes, with request and response
+      shapes filled in from the route implementations. The running server serves the same schema
+      interactively at <code>/docs</code> (Swagger UI) and <code>/redoc</code>; every path below
+      is served under the <code>/api</code> prefix and reached through the Next.js rewrite at
+      <code>http://localhost:3000/api/…</code>. There is no authentication — the app binds to
+      your machine and speaks for one user.
+    </p>
+
+    <div class="apibar">
+      <input id="apisearch" type="search" placeholder="Filter endpoints — try &quot;recreate&quot; or &quot;POST&quot;" aria-label="Filter endpoints">
+      <button class="chip" data-tag="all" aria-pressed="true">All</button>
+      <button class="chip" data-tag="profiles" aria-pressed="false">Profiles</button>
+      <button class="chip" data-tag="media" aria-pressed="false">Media</button>
+      <button class="chip" data-tag="hashtags" aria-pressed="false">Trending</button>
+      <button class="chip" data-tag="recreate" aria-pressed="false">Recreate</button>
+      <button class="chip" data-tag="ops" aria-pressed="false">Ops</button>
+      <span class="apicount" id="apicount"></span>
+    </div>
+
+    <div id="apilist"></div>
+  </section>
+
+  <!-- ============ TESTING ============ -->
+  <section id="testing">
+    <p class="eyebrow">Testing</p>
+    <h2>Four suites, and what each one is for</h2>
+    <p class="prose">
+      338 backend tests, 91 end-to-end tests, and a live canary held back behind a marker. The
+      split is deliberate: the default run must be fast, offline and deterministic, so nothing in
+      it touches the network.
+    </p>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Suite</th><th>Command</th><th>Network</th><th>Covers</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><strong>Backend</strong></td>
+            <td><code>cd api &amp;&amp; python -m pytest</code></td>
+            <td><span class="pill ok">none</span></td>
+            <td>Units, handlers, HTTP surface, adapter mapping — against the fake adapter and a
+              temp directory.</td>
+          </tr>
+          <tr>
+            <td><strong>E2E, native</strong></td>
+            <td><code>bash scripts/e2e-native.sh</code></td>
+            <td><span class="pill ok">none</span></td>
+            <td>The whole stack on the host: uvicorn + <code>next dev</code>, seeded database
+              under <code>.e2e/</code>, <code>IG_ADAPTER=fake</code>.</td>
+          </tr>
+          <tr>
+            <td><strong>E2E, Compose</strong></td>
+            <td><code>bash scripts/e2e.sh</code></td>
+            <td><span class="pill ok">none</span></td>
+            <td>The same Playwright suite through Docker Compose.</td>
+          </tr>
+          <tr>
+            <td><strong>Live canary</strong></td>
+            <td><code>python -m pytest tests/test_live_canary.py -v</code></td>
+            <td><span class="pill warn">real Meta</span></td>
+            <td>Proves the Graph mapping still matches reality. Excluded from the default run by
+              <code>-m "not live"</code>.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note warn">
+      <strong>Before you run the e2e suite.</strong> <code>scripts/e2e-native.sh</code>
+      force-kills whatever is listening on ports <strong>3000</strong> and <strong>8000</strong>,
+      process tree included — <code>kill $!</code> is not enough on Windows, where both
+      <code>npx</code> and uvicorn spawn children that survive it. If another project is serving
+      on either port, it goes down with them. Stop that service first.
+    </div>
+
+    <h3>How the fixtures are built</h3>
+    <p class="prose">
+      The backend suite gets a <code>Settings</code> pointed at <code>tmp_path</code>, a schema'd
+      SQLite connection, a <code>FakeAdapter</code> pre-loaded with the <code>nike</code> profile
+      and ten posts, and a <code>TestClient</code> wired to all three with the worker thread
+      switched off — so tests drive handlers directly and assert on exact state rather than
+      racing a background thread.
+    </p>
+    <p class="prose">
+      The e2e database is seeded by running the <em>real handlers</em> against the fake adapter
+      (<code>api/scripts/seed_e2e.py</code>), not by hand-written SQL. Seeded state is therefore
+      produced by production code paths, and a handler bug shows up in the seed rather than
+      hiding behind fixtures that agree with it.
+    </p>
+
+    <h3>Worked examples</h3>
+
+    <h4>1 — A pure unit: does the ranking rank?</h4>
+    <p class="prose dim" style="font-size:14px">No database, no HTTP. Just rows in, order out.</p>
+<pre><code># api/tests/test_hashtags.py
+def test_a_tag_is_scored_by_the_engagement_of_its_posts():
+    rows = [
+        {"caption": "#nike #run", "like_count": 100, "comments_count": 5, "view_count": None},
+        {"caption": "#run",       "like_count": 10,  "comments_count": 0, "view_count": None},
+    ]
+
+    ranked = hashtags.rank(rows)
+
+    assert [r["tag"] for r in ranked] == ["run", "nike"]   # 115 beats 105
+    assert ranked[0]["post_count"] == 2</code></pre>
+
+    <h4>2 — An HTTP test: does the window actually bound the query?</h4>
+    <p class="prose dim" style="font-size:14px">
+      Rows are inserted directly here rather than driven through the fake adapter, because these
+      tests are about the window and the ranking — hand-written rows say exactly what date and
+      engagement each post has.
+    </p>
+<pre><code># api/tests/test_api_hashtags.py
+def test_trending_ranks_tags_inside_the_window(client, conn):
+    _insert(conn, "a", "#nike #run", hours_ago=2, likes=100, comments=5)
+    _insert(conn, "b", "#run",       hours_ago=3, likes=10)
+
+    body = client.get("/api/hashtags/trending?window=day").json()
+
+    assert body["window"] == "day"
+    assert [i["tag"] for i in body["items"]] == ["run", "nike"]
+    assert body["items"][0]["score"] == 115</code></pre>
+
+    <h4>3 — A failure path: does a spent cap stay out of the breaker?</h4>
+    <p class="prose dim" style="font-size:14px">
+      The interesting assertion is the negative one. Our own budget running out must not make the
+      app back off from Meta, which is a completely separate quota.
+    </p>
+<pre><code># api/tests/test_worker_runner.py
+def test_a_spent_local_cap_fails_the_job_without_tripping_the_breaker(...):
+    # handler raises IgQuotaSpent
+    worker._run_job(conn, current, job)
+
+    assert job_row(conn)["status"] == "failed"
+    assert breaker.state()["tripped"] is False</code></pre>
+
+    <h4>4 — An end-to-end test: does the UI honour the window?</h4>
+    <p class="prose dim" style="font-size:14px">
+      Playwright against the real stack. Note the cleanup: the recreate queue is server state
+      shared with the other specs, so this file leaves it exactly as it found it.
+    </p>
+<pre><code>// web/e2e/trending.spec.ts
+test('switching to the week window brings in older tags', async ({ page }) =&gt; {
+  await page.goto('/trending')
+  // #gear is on posts three days old: absent from the day window by design.
+  await expect(page.getByTestId('trending-row-gear')).toHaveCount(0)
+
+  await page.getByTestId('trending-window').getByText('Week').click()
+
+  await expect(page.getByTestId('trending-row-gear')).toBeVisible()
+})</code></pre>
+
+    <h4>5 — Faking a server response to test paging</h4>
+    <p class="prose dim" style="font-size:14px">
+      The seeded dataset is small, so rather than seeding more data, the test shrinks the page
+      size in flight.
+    </p>
+<pre><code>await page.route('**/api/hashtags/trending*', async (route) =&gt; {
+  const url = new URL(route.request().url())
+  url.searchParams.set('limit', '1')
+  await route.continue({ url: url.toString() })
+})
+
+await page.goto('/trending')
+await expect(page.locator('[data-testid^="trending-row-"]')).toHaveCount(1)
+await expect(page.getByTestId('trending-load-more')).toBeVisible()</code></pre>
+
+    <h3>Coverage by area</h3>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Area</th><th>Backend</th><th>End to end</th></tr></thead>
+        <tbody>
+          <tr><td>Graph adapter, error mapping, response shape</td><td class="num">65</td><td class="num">—</td></tr>
+          <tr><td>HTTP endpoints (profiles, media, downloads, recreate, status, hashtags)</td><td class="num">90</td><td class="num">—</td></tr>
+          <tr><td>Worker: queue, runner, breaker, pacer, backoff, sweep</td><td class="num">39</td><td class="num">—</td></tr>
+          <tr><td>Handlers, hashtags, paths, probe, quota, runtime, db</td><td class="num">144</td><td class="num">—</td></tr>
+          <tr><td>Grid, tabs, filters, selection, download flow</td><td class="num">—</td><td class="num">33</td></tr>
+          <tr><td>Recreate queue and prepare</td><td class="num">—</td><td class="num">22</td></tr>
+          <tr><td>Trending feed</td><td class="num">—</td><td class="num">7</td></tr>
+          <tr><td>Preview, lightbox, retry, polling</td><td class="num">—</td><td class="num">15</td></tr>
+          <tr><td>Home, activity, adapter toggle, limits, usage</td><td class="num">—</td><td class="num">14</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Writing a new case</h3>
+    <ul class="prose">
+      <li><strong>Name the behaviour, not the function.</strong> Every test in this repo reads as
+        a sentence — <code>test_a_spent_local_cap_fails_the_job_without_tripping_the_breaker</code>
+        — so a failure line tells you what broke without opening the file.</li>
+      <li><strong>Pick the cheapest level that can see the bug.</strong> Ranking logic belongs in
+        a pure unit; the window boundary belongs at the HTTP layer; a state race belongs in
+        Playwright.</li>
+      <li><strong>Avoid position-based mocks.</strong> A fixture that says "the third seeded item"
+        breaks the day the seed order changes. Assert on the shortcode.</li>
+      <li><strong>Leave shared server state as you found it.</strong> The recreate queue and the
+        adapter selection persist across specs; clean up in <code>afterEach</code>.</li>
+      <li><strong>Run the canary when Instagram gets weird.</strong> A canary failure means
+        <code>graph_map.py</code> needs updating — re-record fixtures first with
+        <code>python scripts/capture_graph_fixtures.py nike</code>.</li>
+    </ul>
+  </section>
+
+  <!-- ============ CONFIG ============ -->
+  <section id="config">
+    <p class="eyebrow">Configuration</p>
+    <h2>Setup and environment</h2>
+
+<pre><code>cp .env.example .env      # fill in IG_GRAPH_* and OUT_DIR
+docker compose build
+docker compose up -d
+# open http://localhost:3000</code></pre>
+
+    <h3>Getting the Graph credentials</h3>
+    <p class="prose">
+      Business Discovery reads other accounts <em>through an account of your own</em>, so there is
+      a one-time setup. None of it can be automated.
+    </p>
+    <ol class="prose">
+      <li>Convert an Instagram account to <strong>Business</strong> or <strong>Creator</strong>.</li>
+      <li>Create or choose a <strong>Facebook Page</strong> and link the Instagram account to it.
+        Business Discovery is only available through the Facebook-Login flavour of the API, so
+        this link is mandatory.</li>
+      <li>Create a <strong>Meta developer app</strong> and add the Instagram product.</li>
+      <li>Grant the token <code>instagram_basic</code>, <code>pages_show_list</code>,
+        <code>pages_read_engagement</code> and <code>business_management</code>.</li>
+      <li>Find your Instagram user id: <code>GET /me/accounts</code> for the Page id, then
+        <code>GET /{page-id}?fields=instagram_business_account</code>.</li>
+      <li>Prefer a <strong>Business Manager system-user token</strong>, which does not expire,
+        over a long-lived user token, which expires after 60 days.</li>
+    </ol>
+    <p class="prose">Then verify without starting the stack:</p>
+<pre><code>cd api &amp;&amp; IG_GRAPH_TOKEN=... python -m pytest tests/test_live_canary.py -v</code></pre>
+
+    <h3>Environment variables</h3>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Variable</th><th>Default</th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr><td><code>IG_GRAPH_TOKEN</code></td><td class="dim">—</td><td>Access token. Sent as a bearer header, redacted from every log and error.</td></tr>
+          <tr><td><code>IG_GRAPH_USER_ID</code></td><td class="dim">—</td><td>Your own Instagram Business account id — the node Business Discovery hangs off.</td></tr>
+          <tr><td><code>IG_GRAPH_VERSION</code></td><td class="dim">required</td><td>Pinned Graph version, e.g. <code>v23.0</code>. Deliberately has no source-level default, so a Meta deprecation is a config change rather than a release.</td></tr>
+          <tr><td><code>OUT_DIR</code></td><td><code>./downloads</code></td><td>Host folder downloads are written into.</td></tr>
+          <tr><td><code>IG_ADAPTER</code></td><td><code>graph</code></td><td><code>graph</code> or <code>fake</code>. The runtime toggle overrides this and persists its choice.</td></tr>
+          <tr><td><code>FIRST_PAGE_SIZE</code></td><td class="num">12</td><td>Posts indexed on a first look. A Graph page of 200 costs the same one call as a page of 3, so this is bounded by thumbnail fetches, not quota — twelve fills the first screen.</td></tr>
+          <tr><td><code>PAGE_SIZE</code></td><td class="num">36</td><td>Posts fetched per "Load more".</td></tr>
+          <tr><td><code>IG_MIN_INTERVAL</code></td><td class="num">3</td><td>Seconds enforced between Graph API requests.</td></tr>
+          <tr><td><code>IG_CDN_MIN_INTERVAL</code></td><td class="num">0.5</td><td>Seconds between CDN downloads (thumbnails, avatars).</td></tr>
+          <tr><td><code>IG_BACKOFF</code></td><td class="num">900</td><td>Seconds the breaker holds after a rate limit. A floor only — when Meta estimates longer, that wins.</td></tr>
+          <tr><td><code>IG_GRAPH_USAGE_LIMIT</code></td><td class="num">90</td><td>Percentage of Meta's app-usage allowance at which to stop spending calls.</td></tr>
+          <tr><td><code>IG_GRAPH_REFRESH_PAGES</code></td><td class="num">2</td><td>How many pages deep to re-list when a cached media URL has expired.</td></tr>
+          <tr><td><code>IG_REEL_MAX_PER_HOUR</code></td><td class="num">20</td><td>Our own hourly cap on reel video fetches.</td></tr>
+          <tr><td><code>IG_REEL_MAX_PER_DAY</code></td><td class="num">100</td><td>Daily cap on the same.</td></tr>
+          <tr><td><code>IG_REEL_MIN_INTERVAL</code></td><td class="num">20</td><td>Seconds between reel fetches.</td></tr>
+          <tr><td><code>IG_REEL_TIMEOUT</code></td><td class="num">120</td><td>Seconds before a hung <code>yt-dlp</code> is killed — one worker thread serves the whole app, so a hang is a stalled queue, not a slow download.</td></tr>
+          <tr><td><code>DB_PATH</code></td><td><code>/data/app.db</code></td><td>SQLite file. Container path; the host mounts <code>./data</code>.</td></tr>
+          <tr><td><code>MEDIA_DIR</code></td><td><code>/data/media</code></td><td>Thumbnail and original cache root.</td></tr>
+          <tr><td><code>OUT_DIR_CONTAINER</code></td><td><code>/out</code></td><td>Where <code>OUT_DIR</code> is mounted inside the API container.</td></tr>
+          <tr><td><code>API_ORIGIN</code></td><td><code>http://localhost:8000</code></td><td>Where Next.js proxies <code>/api/*</code>. Set to <code>http://api:8000</code> under Compose.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Running without Docker</h3>
+<pre><code>python -m venv .venv
+.venv/Scripts/python -m pip install -r api/requirements.txt
+cd web &amp;&amp; npm install
+
+# then either scripts/e2e-native.sh, or by hand:
+cd api &amp;&amp; DB_PATH=../data/app.db MEDIA_DIR=../data/media \
+  OUT_DIR_CONTAINER=../downloads \
+  ../.venv/Scripts/python -m uvicorn app.main:app --port 8000 --workers 1
+
+cd web &amp;&amp; API_ORIGIN=http://127.0.0.1:8000 npm run dev</code></pre>
+    <div class="note warn">
+      <strong><code>--workers 1</code> is not a tuning knob.</strong> A second uvicorn worker is a
+      second fetch thread, and the whole rate-limit story collapses: the pacer, the breaker and
+      the reel ledger all assume exactly one caller.
+    </div>
+  </section>
+
+  <!-- ============ TROUBLESHOOTING ============ -->
+  <section id="trouble">
+    <p class="eyebrow">Troubleshooting</p>
+    <h2>When something is wrong</h2>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Symptom</th><th>Likely cause</th><th>Fix</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>"has not been synced" on a profile you just looked up</td>
+            <td>The sync job failed. The 404 body carries <code>last_error</code> from the failed
+              job row.</td>
+            <td>Read that message — it is usually "not a Business account" or a token problem.</td>
+          </tr>
+          <tr>
+            <td>Profile exists on Instagram but the app says it is private</td>
+            <td>It is a personal account. Business Discovery cannot see it.</td>
+            <td>Nothing to fix. This is the API's boundary, not a bug.</td>
+          </tr>
+          <tr>
+            <td>Empty grids and odd errors across the board</td>
+            <td>Instagram probably rotated something in the response shape.</td>
+            <td>Run the canary. A failure means <code>api/app/ig/graph_map.py</code> needs
+              updating — re-record fixtures first.</td>
+          </tr>
+          <tr>
+            <td>Downloads sit at <span class="pill neutral">queued</span> forever</td>
+            <td>Worker stopped, or the breaker is tripped.</td>
+            <td>Check <code>/api/status</code>: <code>worker</code> and <code>breaker</code> tell
+              you which.</td>
+          </tr>
+          <tr>
+            <td>A reel refuses to download with a <em>quota</em> status</td>
+            <td>Your own hourly or daily reel cap is spent. This is refused at the click rather
+              than queued against a spent budget.</td>
+            <td>Wait for the countdown in the header, or raise the cap in <code>.env</code>.</td>
+          </tr>
+          <tr>
+            <td>"too far back to refresh; re-sync to open it"</td>
+            <td>The cached CDN URL expired and the post is deeper than
+              <code>IG_GRAPH_REFRESH_PAGES</code>.</td>
+            <td>Re-sync the profile, or raise that setting.</td>
+          </tr>
+          <tr>
+            <td>Meta returns nothing but the token looks fine</td>
+            <td>Usage guard: the peak <code>x-app-usage</code> reading crossed your ceiling and
+              the adapter is refusing to spend calls.</td>
+            <td>Wait for Meta's hourly window to reset, or raise
+              <code>IG_GRAPH_USAGE_LIMIT</code>.</td>
+          </tr>
+          <tr>
+            <td>Another local project died when you ran the tests</td>
+            <td><code>e2e-native.sh</code> force-kills ports 3000 and 8000.</td>
+            <td>Stop that service before running the suite.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Reading the logs</h3>
+    <p class="prose">
+      Every job outcome is one line of JSON — <code>job_id</code>, <code>kind</code>,
+      <code>target</code>, <code>duration_ms</code>, <code>outcome</code> — so
+      <code>grep</code> and <code>jq</code> both work on it without a parser. Outcomes are
+      <code>done</code>, <code>rate_limited</code>, <code>challenge</code>,
+      <code>quota_spent</code>, <code>terminal</code>, <code>transient</code>, or
+      <code>crashed</code>. The boot sweep logs its own line saying how many <code>.part</code>
+      files, items and jobs it recovered.
+    </p>
+
+    <footer>
+      <p>
+        instascraper · local single-user tool · reads public Business and Creator accounts through
+        Meta's Business Discovery API. Source of truth for anything here is the code in
+        <code>api/app/</code> and <code>web/</code>; this manual is generated from it.
+      </p>
+    </footer>
+  </main>
+</div>
+
+<script type="application/json" id="openapi">{"openapi":"3.1.0","info":{"title":"instascraper","version":"0.1.0"},"paths":{"/api/status":{"get":{"summary":"Get Status","operationId":"get_status_api_status_get","responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{}}}}}}},"/api/adapter":{"post":{"summary":"Set Adapter","description":"Switch the live adapter, and with it the data root it reads and writes.","operationId":"set_adapter_api_adapter_post","requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/AdapterBody"}}},"required":true},"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/api/recreate":{"get":{"summary":"List Items","operationId":"list_items_api_recreate_get","responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{}}}}}},"post":{"summary":"Mark","operationId":"mark_api_recreate_post","requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/MarkBody"}}},"required":true},"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/api/recreate/{shortcode}":{"get":{"summary":"Get Item","operationId":"get_item_api_recreate__shortcode__get","parameters":[{"name":"shortcode","in":"path","required":true,"schema":{"type":"string","title":"Shortcode"}}],"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}},"delete":{"summary":"Unmark","operationId":"unmark_api_recreate__shortcode__delete","parameters":[{"name":"shortcode","in":"path","required":true,"schema":{"type":"string","title":"Shortcode"}}],"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/api/recreate/{shortcode}/prepare":{"post":{"summary":"Prepare","description":"Build the handoff payload from what is actually on disk.\n\nEvery path in it is one we have just read out of media_files, so the\npayload cannot name a file that was never downloaded.","operationId":"prepare_api_recreate__shortcode__prepare_post","parameters":[{"name":"shortcode","in":"path","required":true,"schema":{"type":"string","title":"Shortcode"}}],"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/PrepareBody"}}}},"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/api/activity":{"get":{"summary":"Get Activity","operationId":"get_activity_api_activity_get","parameters":[{"name":"limit","in":"query","required":false,"schema":{"type":"integer","maximum":1000,"minimum":1,"default":100,"title":"Limit"}}],"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/api/profiles":{"get":{"summary":"List Profiles","operationId":"list_profiles_api_profiles_get","responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{}}}}}}},"/api/profiles/{username}":{"get":{"summary":"Get Profile","operationId":"get_profile_api_profiles__username__get","parameters":[{"name":"username","in":"path","required":true,"schema":{"type":"string","title":"Username"}}],"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/api/profiles/{username}/avatar":{"get":{"summary":"Get Avatar","operationId":"get_avatar_api_profiles__username__avatar_get","parameters":[{"name":"username","in":"path","required":true,"schema":{"type":"string","title":"Username"}}],"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/api/profiles/{username}/sync":{"post":{"summary":"Sync Profile","operationId":"sync_profile_api_profiles__username__sync_post","parameters":[{"name":"username","in":"path","required":true,"schema":{"type":"string","title":"Username"}}],"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/api/profiles/{username}/tracked":{"put":{"summary":"Set Tracked","operationId":"set_tracked_api_profiles__username__tracked_put","parameters":[{"name":"username","in":"path","required":true,"schema":{"type":"string","title":"Username"}}],"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/TrackedBody"}}}},"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/api/profiles/{username}/media":{"get":{"summary":"List Media","operationId":"list_media_api_profiles__username__media_get","parameters":[{"name":"username","in":"path","required":true,"schema":{"type":"string","title":"Username"}},{"name":"limit","in":"query","required":false,"schema":{"type":"integer","maximum":500,"minimum":1,"default":60,"title":"Limit"}},{"name":"offset","in":"query","required":false,"schema":{"type":"integer","minimum":0,"default":0,"title":"Offset"}}],"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/api/profiles/{username}/load-more":{"post":{"summary":"Load More","operationId":"load_more_api_profiles__username__load_more_post","parameters":[{"name":"username","in":"path","required":true,"schema":{"type":"string","title":"Username"}}],"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/api/profiles/{username}/cache":{"delete":{"summary":"Clear Cache","operationId":"clear_cache_api_profiles__username__cache_delete","parameters":[{"name":"username","in":"path","required":true,"schema":{"type":"string","title":"Username"}}],"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/api/media/{shortcode}/thumb":{"get":{"summary":"Get Thumb","operationId":"get_thumb_api_media__shortcode__thumb_get","parameters":[{"name":"shortcode","in":"path","required":true,"schema":{"type":"string","title":"Shortcode"}}],"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/api/media/{shortcode}/full":{"get":{"summary":"Get Full","operationId":"get_full_api_media__shortcode__full_get","parameters":[{"name":"shortcode","in":"path","required":true,"schema":{"type":"string","title":"Shortcode"}},{"name":"child","in":"query","required":false,"schema":{"type":"integer","minimum":0,"default":0,"title":"Child"}}],"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/api/media/ensure":{"post":{"summary":"Ensure","operationId":"ensure_api_media_ensure_post","requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/EnsureBody"}}},"required":true},"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/api/media/{shortcode}/preview":{"get":{"summary":"Get Preview","description":"Point at the source image for one slide, before anything is downloaded.\n\nBusiness Discovery hands us a url per child when the post is indexed, so\na carousel can be previewed slide by slide without spending a download\nfirst. Those urls expire, which is why this redirects rather than\npromising to serve the bytes: a dead one fails as a broken image the\ncaller can fall back from, not as a cached wrong answer.","operationId":"get_preview_api_media__shortcode__preview_get","parameters":[{"name":"shortcode","in":"path","required":true,"schema":{"type":"string","title":"Shortcode"}},{"name":"child","in":"query","required":false,"schema":{"type":"integer","default":0,"title":"Child"}}],"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/api/downloads":{"post":{"summary":"Create Download","operationId":"create_download_api_downloads_post","requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/DownloadBody"}}},"required":true},"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/api/hashtags/trending":{"get":{"summary":"Trending","operationId":"trending_api_hashtags_trending_get","parameters":[{"name":"window","in":"query","required":false,"schema":{"type":"string","default":"day","title":"Window"}},{"name":"limit","in":"query","required":false,"schema":{"type":"integer","maximum":200,"minimum":1,"default":25,"title":"Limit"}},{"name":"offset","in":"query","required":false,"schema":{"type":"integer","minimum":0,"default":0,"title":"Offset"}}],"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/api/hashtags/{tag}/posts":{"get":{"summary":"Tag Posts","description":"The posts carrying one tag, newest first.\n\nA tag nobody used is an empty list rather than a 404: a tag that has\nfallen out of the window is not an error, and this endpoint cannot\nhonestly tell that case apart from one that never existed.","operationId":"tag_posts_api_hashtags__tag__posts_get","parameters":[{"name":"tag","in":"path","required":true,"schema":{"type":"string","title":"Tag"}},{"name":"window","in":"query","required":false,"schema":{"type":"string","default":"day","title":"Window"}},{"name":"limit","in":"query","required":false,"schema":{"type":"integer","maximum":200,"minimum":1,"default":24,"title":"Limit"}},{"name":"offset","in":"query","required":false,"schema":{"type":"integer","minimum":0,"default":0,"title":"Offset"}}],"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/api/health/canary":{"get":{"summary":"Canary","operationId":"canary_api_health_canary_get","parameters":[{"name":"username","in":"query","required":false,"schema":{"type":"string","default":"instagram","title":"Username"}}],"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/api/health/clear-breaker":{"post":{"summary":"Clear Breaker","operationId":"clear_breaker_api_health_clear_breaker_post","responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{}}}}}}}},"components":{"schemas":{"AdapterBody":{"properties":{"adapter":{"type":"string","title":"Adapter"}},"type":"object","required":["adapter"],"title":"AdapterBody"},"DownloadBody":{"properties":{"shortcodes":{"items":{"type":"string"},"type":"array","title":"Shortcodes"},"base":{"type":"string","title":"Base"}},"type":"object","required":["shortcodes","base"],"title":"DownloadBody"},"EnsureBody":{"properties":{"shortcodes":{"items":{"type":"string"},"type":"array","title":"Shortcodes"},"retry":{"type":"boolean","title":"Retry","default":false}},"type":"object","required":["shortcodes"],"title":"EnsureBody"},"HTTPValidationError":{"properties":{"detail":{"items":{"$ref":"#/components/schemas/ValidationError"},"type":"array","title":"Detail"}},"type":"object","title":"HTTPValidationError"},"MarkBody":{"properties":{"shortcodes":{"items":{"type":"string"},"type":"array","title":"Shortcodes"}},"type":"object","required":["shortcodes"],"title":"MarkBody"},"PrepareBody":{"properties":{"slides":{"anyOf":[{"items":{"type":"integer"},"type":"array"},{"type":"null"}],"title":"Slides"}},"type":"object","title":"PrepareBody"},"TrackedBody":{"properties":{"tracked":{"type":"boolean","title":"Tracked"}},"type":"object","required":["tracked"],"title":"TrackedBody"},"ValidationError":{"properties":{"loc":{"items":{"anyOf":[{"type":"string"},{"type":"integer"}]},"type":"array","title":"Location"},"msg":{"type":"string","title":"Message"},"type":{"type":"string","title":"Error Type"}},"type":"object","required":["loc","msg","type"],"title":"ValidationError"}}}}</script>
+
+<script>
+(function () {
+  'use strict'
+
+  /* ---------------- section nav ---------------- */
+  var links = Array.prototype.slice.call(document.querySelectorAll('#railnav a'))
+  var targets = links.map(function (a) { return document.querySelector(a.getAttribute('href')) })
+  if ('IntersectionObserver' in window) {
+    var seen = new Map()
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) { seen.set(e.target.id, e.intersectionRatio) })
+      var best = null, bestRatio = 0
+      seen.forEach(function (ratio, id) { if (ratio > bestRatio) { bestRatio = ratio; best = id } })
+      if (!best) return
+      links.forEach(function (a) {
+        a.classList.toggle('on', a.getAttribute('href') === '#' + best)
+      })
+    }, { rootMargin: '-10% 0px -70% 0px', threshold: [0, 0.25, 0.5, 1] })
+    targets.forEach(function (t) { if (t) io.observe(t) })
+  }
+
+  /* ---------------- api reference ---------------- */
+  var raw = document.getElementById('openapi').textContent
+  var spec
+  try { spec = JSON.parse(raw) } catch (e) { spec = { paths: {} } }
+
+  // Route implementations carry the meaning FastAPI's generated schema cannot:
+  // what an endpoint is for, what it answers with, and how it fails.
+  var DOC = {
+    'GET /api/status': {
+      tag: 'ops', blurb: 'Live health of the whole system',
+      about: 'Polled by the header every five seconds. The single call behind the worker readout, the queue depth, the quota meter, the reel countdown and the breaker banner.',
+      returns: {
+        worker: 'running', adapter: 'graph', token_configured: true,
+        breaker: { tripped: false, permanent: false, reason: null, seconds_remaining: null },
+        queue_depth: 0, usage: 12.4,
+        reel_limits: { hour: { used: 3, max: 20, resets_at: '2026-08-25T15:04:00+00:00' }, day: { used: 11, max: 100, resets_at: null } }
+      },
+      notes: ['<code>usage</code> is null when the live adapter never calls Meta — a 0% there would read as a measurement rather than an absent one.']
+    },
+    'POST /api/adapter': {
+      tag: 'ops', blurb: 'Switch dataset at runtime',
+      about: 'Swaps the live adapter and, with it, the database and media cache it reads and writes. Everything that can fail happens before the swap, so a failed switch leaves the process exactly where it was. Clears the breaker and persists the choice last.',
+      returns: { adapter: 'fake' },
+      errors: [['400', 'unknown adapter name — only <code>graph</code> and <code>fake</code> exist']]
+    },
+    'GET /api/health/canary': {
+      tag: 'ops', blurb: 'Prove the adapter still works',
+      about: 'Runs profile → page → media against the real API and reports which of the three steps survived. Shared verbatim with the live test, so the endpoint and the test can never drift.',
+      returns: { ok: true, checks: { profile: true, page: true, media: true }, error: null },
+      notes: ['A canary reports; it does not raise. A failure comes back as <code>ok: false</code> with the exception in <code>error</code>.']
+    },
+    'POST /api/health/clear-breaker': {
+      tag: 'ops', blurb: 'Resume after a permanent trip',
+      about: 'What the "I have fixed it" button calls. A permanent trip never expires on its own, because automatically retrying past a login challenge is how a throttled account becomes a flagged one.',
+      returns: { cleared: true }
+    },
+    'GET /api/activity': {
+      tag: 'ops', blurb: 'Who did what, when',
+      about: 'Newest first. Actions are <code>lookup</code>, <code>load_more</code>, <code>track</code>, <code>untrack</code> and <code>download</code>.',
+      returns: { items: [{ id: 42, ts: '2026-08-25T09:12:44+00:00', action: 'download', target: null, detail: { base: 'campaign', count: 7, out: '/out', shortcodes: ['Dcb…'] } }] }
+    },
+
+    'GET /api/profiles': {
+      tag: 'profiles', blurb: 'Tracked profiles for the sidebar',
+      about: 'Only accounts you pinned. Sorted by username.',
+      returns: { items: [{ username: 'nike', full_name: 'Nike', post_count: 1240, avatar_url: '/api/profiles/nike/avatar', last_synced_at: '2026-08-25T08:00:00+00:00' }] }
+    },
+    'GET /api/profiles/{username}': {
+      tag: 'profiles', blurb: 'One profile, with cache state',
+      about: 'Adds two things the raw profile does not have: <code>cached_count</code>, how many of its posts are downloaded, and <code>exhausted</code>, whether the walk has reached the end of the account.',
+      returns: { username: 'nike', full_name: 'Nike', biography: 'Just do it.', is_private: false, post_count: 1240, followers_count: 302000000, avatar_url: '/api/profiles/nike/avatar', tracked: true, last_synced_at: '2026-08-25T08:00:00+00:00', exhausted: false, cached_count: 18 },
+      errors: [['404', 'never synced — the body carries <code>last_error</code> from the most recent failed sync job, which is usually the real answer']]
+    },
+    'GET /api/profiles/{username}/avatar': {
+      tag: 'profiles', blurb: 'Cached avatar image',
+      about: 'Serves the JPEG from the local media cache. Never proxies Instagram.',
+      returns: '<binary image/jpeg>',
+      errors: [['404', 'no avatar cached, or the file is missing from disk']]
+    },
+    'POST /api/profiles/{username}/sync': {
+      tag: 'profiles', blurb: 'Queue a metadata refresh',
+      about: 'Enqueues <code>profile_sync</code>, records a <code>lookup</code> in the activity log and wakes the worker. Returns immediately — no HTTP request ever waits on Meta.',
+      returns: { queued: true },
+      notes: ['<code>queued: false</code> means an identical job was already queued or running. Deduplication is on kind plus payload.']
+    },
+    'PUT /api/profiles/{username}/tracked': {
+      tag: 'profiles', blurb: 'Pin or unpin',
+      about: 'Toggles sidebar membership and writes a <code>track</code> or <code>untrack</code> row into the activity log.',
+      returns: { tracked: true },
+      errors: [['404', 'unknown profile']]
+    },
+    'GET /api/profiles/{username}/media': {
+      tag: 'profiles', blurb: 'The grid, paged',
+      about: 'Newest first, ties broken by shortcode so offset paging is stable. <code>total</code> counts every indexed post, not just this page.',
+      returns: { items: [{ shortcode: 'DcbKomNij3K', kind: 'carousel', taken_at: '2026-08-24T18:02:11+00:00', caption: 'new season #gear', is_video: false, video_children: [2], child_count: 3, like_count: 40311, comments_count: 812, view_count: null, full_status: 'ready', full_error: null, thumb_url: '/api/media/DcbKomNij3K/thumb', ig_url: 'https://instagram.com/p/DcbKomNij3K/' }], total: 48, exhausted: false },
+      notes: ['<code>video_children</code> exists because <code>is_video</code> describes the post, and a carousel is never a video even when it holds one. Without it the viewer renders every slide as an image and the video ones break.'],
+      errors: [['404', 'unknown profile']]
+    },
+    'POST /api/profiles/{username}/load-more': {
+      tag: 'profiles', blurb: 'Walk one page deeper',
+      about: 'Enqueues <code>page_fetch</code> using the stored cursor. An exhausted profile returns without queueing anything — once the walk reaches the end, Instagram is never asked about that account again.',
+      returns: { queued: true, exhausted: false },
+      errors: [['404', 'unknown profile']]
+    },
+    'DELETE /api/profiles/{username}/cache': {
+      tag: 'profiles', blurb: 'Drop cached files for a profile',
+      about: 'Removes the media directory, deletes its <code>media_files</code> rows and resets every item to <code>full_status=none</code>. Metadata and the recreate queue survive — an entry there is a snapshot, so queued work cannot be deleted by clearing a cache.',
+      returns: { removed_files: 61 }
+    },
+
+    'GET /api/media/{shortcode}/thumb': {
+      tag: 'media', blurb: 'Cached thumbnail',
+      about: 'Served from disk. Every tile in the grid points here.',
+      returns: '<binary image/jpeg>',
+      errors: [['404', 'no thumbnail cached, or the file is missing']]
+    },
+    'GET /api/media/{shortcode}/full': {
+      tag: 'media', blurb: 'Downloaded original',
+      about: 'Only answers once the post is <code>ready</code>. <code>child</code> selects a carousel slide.',
+      returns: '<binary, inline>',
+      errors: [['404', 'not cached, no such child, or the file is missing']]
+    },
+    'GET /api/media/{shortcode}/preview': {
+      tag: 'media', blurb: 'Look before you download',
+      about: 'Redirects (307) to the source URL Business Discovery handed us when the post was indexed, so a carousel can be previewed slide by slide without spending a download first.',
+      returns: '307 → https://scontent.cdninstagram.com/…',
+      notes: ['A redirect rather than a proxy on purpose: those URLs expire, and a dead one should fail as a broken image the caller can fall back from, never as a cached wrong answer.'],
+      errors: [['404', 'no sources recorded, no such slide, or the slide is a video — there is no still to hand back, so the caller draws its own placeholder']]
+    },
+    'POST /api/media/ensure': {
+      tag: 'media', blurb: 'Make sure these are downloaded',
+      about: 'The first half of every download. Queues whatever is not cached and reports a status per shortcode, so the browser can show progress and know when to call <code>/api/downloads</code>. Pass <code>retry: true</code> to re-attempt failures.',
+      returns: { statuses: { Dcb1: 'ready', Dcb2: 'queued', Dcb3: 'quota' }, errors: { Dcb3: 'hourly reel cap spent (20/20)' }, ready: 1, total: 3 },
+      notes: ['Statuses are <code>ready</code>, <code>queued</code>, <code>fetching</code>, <code>failed</code>, <code>quota</code> and <code>unknown</code>.', 'A reel is refused here rather than queued when the cap is spent — a job queued against a spent budget only fails later, somewhere nobody is looking.']
+    },
+    'POST /api/downloads': {
+      tag: 'media', blurb: 'Copy originals into OUT_DIR',
+      about: 'Purely local: every byte is already on disk. Files are ordered oldest-first so the numbering reads chronologically, and written individually — never zipped.',
+      returns: { written: ['campaign_01.jpg', 'campaign_02a.jpg', 'campaign_02b.jpg'], out_dir: '/out', count: 3 },
+      notes: ['The base filename is sanitised by collapsing every non-alphanumeric run into a single underscore, so path separators and traversal sequences cannot survive it.', 'A name collision gets a <code>-1</code> suffix. Nothing is ever overwritten.'],
+      errors: [['400', 'no items selected'], ['409', 'some items are not cached yet — the body lists them in <code>not_ready</code>']]
+    },
+
+    'GET /api/hashtags/trending': {
+      tag: 'hashtags', blurb: 'Ranked tags for a window',
+      about: 'Read-only over cached captions. Nothing here writes and nothing here talks to Instagram.',
+      returns: { window: 'day', since: '2026-08-24T09:00:00+00:00', total: 14, items: [{ tag: 'nike', score: 51200, like_count: 48000, comments_count: 1200, view_count: 2000, post_count: 6 }] },
+      notes: ['<code>since</code> is returned so the page can say exactly what period it covered.', 'An unknown window is a 400 naming what was asked for — falling back to a default would answer a typo with real-looking numbers for a period nobody asked about.'],
+      errors: [['400', 'unknown window; the body lists the allowed ones']]
+    },
+    'GET /api/hashtags/{tag}/posts': {
+      tag: 'hashtags', blurb: 'The posts behind one tag',
+      about: 'Newest first, in the same shape the media grid consumes. The leading <code>#</code> is optional and matching is case-folded.',
+      returns: { tag: 'nike', window: 'day', total: 6, items: ['…same shape as /profiles/{u}/media items…'] },
+      notes: ['A tag nobody used is an empty list rather than a 404: a tag that fell out of the window is not an error, and this endpoint cannot honestly tell that case apart from one that never existed.'],
+      errors: [['400', 'unknown window']]
+    },
+
+    'GET /api/recreate': {
+      tag: 'recreate', blurb: 'The remake queue',
+      about: 'Newest first. Each entry is a snapshot taken when it was marked, not a view over <code>media_items</code>.',
+      returns: { items: [{ shortcode: 'DcbKomNij3K', username: 'nike', ig_url: 'https://instagram.com/p/DcbKomNij3K/', caption: 'new season #gear', status: 'selected', error: null, added_at: '2026-08-25T09:00:00+00:00', prepared_at: null, payload: null, thumb_url: '/api/media/DcbKomNij3K/thumb' }] }
+    },
+    'POST /api/recreate': {
+      tag: 'recreate', blurb: 'Mark posts for remaking',
+      about: 'Idempotent — marking something twice adds nothing. A shortcode with no indexed post comes back in <code>unknown</code> rather than being written as an empty row: an entry that cannot name its source is not work anyone can do.',
+      returns: { added: 2, unknown: ['NotARealCode'] }
+    },
+    'GET /api/recreate/{shortcode}': {
+      tag: 'recreate', blurb: 'One queue entry',
+      about: 'Includes the prepared payload once it exists.',
+      returns: { shortcode: 'DcbKomNij3K', status: 'prepared', prepared_at: '2026-08-25T09:30:00+00:00', payload: '…' },
+      errors: [['404', 'not marked for recreation']]
+    },
+    'DELETE /api/recreate/{shortcode}': {
+      tag: 'recreate', blurb: 'Remove from the queue',
+      about: 'Removes only the queue entry. Cached media is untouched.',
+      returns: { removed: 1 }
+    },
+    'POST /api/recreate/{shortcode}/prepare': {
+      tag: 'recreate', blurb: 'Build the handoff payload',
+      about: 'Built from what is actually on disk: every path is read out of <code>media_files</code>, so the payload cannot name a file that was never downloaded. <code>slides: null</code> means "whatever the post has" — a single post has no choice to make, and a carousel defaults to all of it.',
+      returns: { shortcode: 'DcbKomNij3K', username: 'nike', ig_url: 'https://instagram.com/p/DcbKomNij3K/', caption: 'new season #gear', kind: 'carousel', taken_at: '2026-08-24T18:02:11+00:00', prepared_at: '2026-08-25T09:30:00+00:00', slides: [{ index: 0, path: 'nike/DcbKomNij3K/full.jpg', mime: 'image/jpeg', bytes: 812443, width: 1440, height: 1800 }] },
+      notes: ['Paths are relative to the media root. An absolute path leaks a home directory into a payload that gets passed around, and is no more usable anywhere else.', 'Status becomes <code>prepared</code>, never "submitted" — that word is earned the day a handoff actually happens.'],
+      errors: [['400', 'no such slide; the body lists the available ones'], ['404', 'not marked for recreation'], ['409', 'the post is not downloaded yet — fetch it before preparing']]
+    }
+  }
+
+  var ORDER = ['ops', 'profiles', 'media', 'hashtags', 'recreate']
+  var VERBS = ['get', 'post', 'put', 'delete', 'patch']
+
+  var ops = []
+  Object.keys(spec.paths || {}).forEach(function (path) {
+    VERBS.forEach(function (verb) {
+      var node = spec.paths[path][verb]
+      if (!node) return
+      var key = verb.toUpperCase() + ' ' + path
+      ops.push({ key: key, verb: verb, path: path, node: node, doc: DOC[key] || {} })
+    })
+  })
+  ops.sort(function (a, b) {
+    var ta = ORDER.indexOf(a.doc.tag || 'ops'), tb = ORDER.indexOf(b.doc.tag || 'ops')
+    if (ta !== tb) return ta - tb
+    if (a.path !== b.path) return a.path < b.path ? -1 : 1
+    return VERBS.indexOf(a.verb) - VERBS.indexOf(b.verb)
+  })
+
+  function esc(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  }
+
+  function typeOf(schema) {
+    if (!schema) return 'any'
+    if (schema.$ref) return schema.$ref.split('/').pop()
+    if (schema.anyOf) return schema.anyOf.map(typeOf).join(' | ')
+    if (schema.type === 'array') return typeOf(schema.items) + '[]'
+    var t = schema.type || 'any'
+    var bits = []
+    if (schema.minimum !== undefined) bits.push('min ' + schema.minimum)
+    if (schema.maximum !== undefined) bits.push('max ' + schema.maximum)
+    return bits.length ? t + ' (' + bits.join(', ') + ')' : t
+  }
+
+  function bodySchema(node) {
+    var content = node.requestBody && node.requestBody.content
+    var ref = content && content['application/json'] && content['application/json'].schema
+    if (!ref || !ref.$ref) return null
+    var name = ref.$ref.split('/').pop()
+    var model = spec.components && spec.components.schemas && spec.components.schemas[name]
+    return model ? { name: name, model: model } : null
+  }
+
+  function renderParams(node) {
+    var params = node.parameters || []
+    if (!params.length) return ''
+    var rows = params.map(function (p) {
+      return '<tr><td><code>' + esc(p.name) + '</code>' +
+        (p.required ? ' <span class="req">required</span>' : '') + '</td>' +
+        '<td class="dim mono" style="font-size:12px">' + esc(p.in) + '</td>' +
+        '<td class="mono" style="font-size:12px">' + esc(typeOf(p.schema)) + '</td>' +
+        '<td class="dim">' + (p.schema && p.schema.default !== undefined
+          ? 'default <code>' + esc(JSON.stringify(p.schema.default)) + '</code>' : '—') + '</td></tr>'
+    }).join('')
+    return '<h5>Parameters</h5><div class="tablewrap" style="margin:0"><table class="params"><tbody>' + rows + '</tbody></table></div>'
+  }
+
+  function renderBody(node) {
+    var body = bodySchema(node)
+    if (!body) return ''
+    var props = body.model.properties || {}
+    var required = body.model.required || []
+    var rows = Object.keys(props).map(function (name) {
+      var p = props[name]
+      return '<tr><td><code>' + esc(name) + '</code>' +
+        (required.indexOf(name) !== -1 ? ' <span class="req">required</span>' : '') + '</td>' +
+        '<td class="mono" style="font-size:12px">' + esc(typeOf(p)) + '</td>' +
+        '<td class="dim">' + (p.default !== undefined
+          ? 'default <code>' + esc(JSON.stringify(p.default)) + '</code>' : '—') + '</td></tr>'
+    }).join('')
+    return '<h5>Request body · <code>' + esc(body.name) + '</code></h5>' +
+      '<div class="tablewrap" style="margin:0"><table class="params"><tbody>' + rows + '</tbody></table></div>'
+  }
+
+  function renderReturns(doc) {
+    if (doc.returns === undefined) return ''
+    var text = typeof doc.returns === 'string' ? doc.returns : JSON.stringify(doc.returns, null, 2)
+    return '<h5>200 response</h5><pre><code>' + esc(text) + '</code></pre>'
+  }
+
+  function renderErrors(doc, node) {
+    var list = (doc.errors || []).slice()
+    if (node.parameters && node.parameters.length || bodySchema(node)) {
+      list.push(['422', 'validation error — a parameter or body field failed its constraint'])
+    }
+    if (!list.length) return ''
+    return '<h5>Failures</h5><div class="errs">' + list.map(function (e) {
+      return '<div class="err"><span class="code">' + e[0] + '</span><span>' + e[1] + '</span></div>'
+    }).join('') + '</div>'
+  }
+
+  function renderNotes(doc) {
+    if (!doc.notes || !doc.notes.length) return ''
+    return '<h5>Worth knowing</h5><ul style="font-size:14px;color:var(--ink-2)">' +
+      doc.notes.map(function (n) { return '<li>' + n + '</li>' }).join('') + '</ul>'
+  }
+
+  var list = document.getElementById('apilist')
+  list.innerHTML = ops.map(function (op) {
+    var pretty = esc(op.path).replace(/\{([^}]+)\}/g, '<em>{$1}</em>')
+    return '<details class="op" data-tag="' + (op.doc.tag || 'ops') + '" data-search="' +
+      esc((op.key + ' ' + (op.doc.blurb || '') + ' ' + (op.doc.about || '')).toLowerCase()) + '">' +
+      '<summary><span class="verb ' + op.verb + '">' + op.verb.toUpperCase() + '</span>' +
+      '<span class="path">' + pretty + '</span>' +
+      '<span class="blurb">' + esc(op.doc.blurb || op.node.summary || '') + '</span></summary>' +
+      '<div class="opbody">' +
+      (op.doc.about ? '<p>' + op.doc.about + '</p>' : '') +
+      renderParams(op.node) + renderBody(op.node) + renderReturns(op.doc) +
+      renderNotes(op.doc) + renderErrors(op.doc, op.node) +
+      '<details class="spec-toggle"><summary>OpenAPI fragment</summary><pre><code>' +
+      esc(JSON.stringify(op.node, null, 1)) + '</code></pre></details>' +
+      '</div></details>'
+  }).join('')
+
+  var cards = Array.prototype.slice.call(list.querySelectorAll('.op'))
+  var chips = Array.prototype.slice.call(document.querySelectorAll('.chip'))
+  var search = document.getElementById('apisearch')
+  var count = document.getElementById('apicount')
+  var activeTag = 'all'
+
+  function apply() {
+    var q = search.value.trim().toLowerCase()
+    var shown = 0
+    cards.forEach(function (c) {
+      var okTag = activeTag === 'all' || c.getAttribute('data-tag') === activeTag
+      var okQ = !q || c.getAttribute('data-search').indexOf(q) !== -1
+      var on = okTag && okQ
+      c.style.display = on ? '' : 'none'
+      if (on) shown++
+    })
+    count.textContent = shown + ' of ' + cards.length
+  }
+
+  chips.forEach(function (chip) {
+    chip.addEventListener('click', function () {
+      activeTag = chip.getAttribute('data-tag')
+      chips.forEach(function (c) { c.setAttribute('aria-pressed', String(c === chip)) })
+      apply()
+    })
+  })
+  search.addEventListener('input', apply)
+  apply()
+})()
+</script>
