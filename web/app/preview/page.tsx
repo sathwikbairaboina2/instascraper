@@ -515,8 +515,10 @@ function Screen({
                   size="small"
                   column={1}
                   colon={false}
-                  labelStyle={{ fontSize: 11, color: token.colorTextTertiary, width: 78 }}
-                  contentStyle={{ fontSize: 12 }}
+                  styles={{
+                    label: { fontSize: 11, color: token.colorTextTertiary, width: 78 },
+                    content: { fontSize: 12 },
+                  }}
                   items={[
                     { key: 'c', label: 'Shortcode', children: <Text code copyable style={{ fontSize: 11 }}>{one.code}</Text> },
                     { key: 'k', label: 'Kind', children: one.kind === 'carousel' ? `carousel, ${one.children} slides` : one.kind },

@@ -85,7 +85,10 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS)
   const [density, setDensity] = useState('Comfortable')
   const [preview, setPreview] = useState<MediaSummary | null>(null)
-  const [base, setBase] = useState('')
+  // Seeded, not just hinted. This used to be a placeholder that read as a
+  // value, so the first press of Download always failed on an empty field
+  // while the name the app itself suggested sat there unused.
+  const [base, setBase] = useState(username)
   const [saved, setSaved] = useState<SavedSelection[]>([])
   const [saveName, setSaveName] = useState('')
 
@@ -122,6 +125,8 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
   const router = useRouter()
 
   useEffect(() => setSaved(loadSelections(username)), [username])
+  // A different profile is a different batch, so it gets its own suggestion.
+  useEffect(() => setBase(username), [username])
 
 
   const total = media?.total ?? 0
@@ -477,8 +482,10 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
                 size="small"
                 column={1}
                 colon={false}
-                labelStyle={{ fontSize: 11, color: token.colorTextTertiary, width: 78 }}
-                contentStyle={{ fontSize: 12 }}
+                styles={{
+                  label: { fontSize: 11, color: token.colorTextTertiary, width: 78 },
+                  content: { fontSize: 12 },
+                }}
                 items={[
                   { key: 'c', label: 'Shortcode', children: <Text code copyable style={{ fontSize: 11 }}>{one.shortcode}</Text> },
                   { key: 'k', label: 'Kind', children: one.child_count > 1 ? `carousel, ${one.child_count} slides` : one.kind },
