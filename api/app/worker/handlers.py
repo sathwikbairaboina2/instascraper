@@ -58,7 +58,15 @@ def handle_profile_sync(ctx: HandlerContext, payload: dict) -> None:
             "UPDATE profiles SET next_cursor=NULL WHERE username=?", (username,)
         )
     elif row["next_cursor"] is not None:
-        return  # a walk is already part-way through; leave its cursor alone
+        # A walk is part-way through, so its cursor is left alone -- but the
+        # newest posts still need re-reading. Business Discovery serves
+        # newest-first, so the recent end of a profile is what the cursor
+        # passed first and will never return to. Anything those rows were
+        # missing when they were indexed -- engagement counts, most visibly --
+        # stayed missing forever, which is why the trending day window read
+        # zero on every row. One page from the front fixes that.
+        ctx.enqueue("page_fetch", {"username": username, "from_front": True})
+        return
     ctx.enqueue("page_fetch", {"username": username})
 
 
@@ -70,13 +78,22 @@ def handle_page_fetch(ctx: HandlerContext, payload: dict) -> None:
     if row is None:
         raise t.IgNotFound(f"{username} has not been synced")
 
-    cursor = row["next_cursor"]
-    if cursor == "":
-        return  # exhausted; never hit Instagram again for this profile
+    # A refresh reads the newest page and leaves the walk exactly where it is.
+    # It exists because the cursor only ever moves away from recent posts.
+    from_front = bool(payload.get("from_front"))
 
-    # A null cursor means nothing has been indexed yet: take the cheap first
-    # page. Every later page is a deliberate "Load more".
-    limit = ctx.settings.first_page_size if cursor is None else ctx.settings.page_size
+    cursor = row["next_cursor"]
+    if from_front:
+        cursor = None
+        limit = ctx.settings.page_size
+    elif cursor == "":
+        return  # exhausted; never hit Instagram again for this profile
+    else:
+        # A null cursor means nothing has been indexed yet: take the cheap
+        # first page. Every later page is a deliberate "Load more".
+        limit = (
+            ctx.settings.first_page_size if cursor is None else ctx.settings.page_size
+        )
 
     ctx.pacer.wait()
     page = ctx.adapter.fetch_page(username, cursor, limit)
@@ -127,6 +144,12 @@ def handle_page_fetch(ctx: HandlerContext, payload: dict) -> None:
         )
 
         _ensure_thumb(ctx, username, post)
+
+    if from_front:
+        # Deliberately not written. This page was read to refresh rows, not to
+        # advance the walk, and overwriting the cursor here would send the
+        # profile back over ground it has already covered.
+        return
 
     ctx.conn.execute(
         "UPDATE profiles SET next_cursor=? WHERE username=?",

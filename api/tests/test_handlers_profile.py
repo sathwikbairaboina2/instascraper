@@ -48,7 +48,13 @@ def test_profile_sync_upserts_row_and_avatar(ctx, settings):
     assert (settings.media_dir / "nike" / "avatar.jpg").exists()
 
 
-def test_profile_sync_enqueues_first_page_only_once(ctx):
+def test_profile_sync_never_restarts_a_walk_that_is_part_way(ctx):
+    """The second sync refreshes the newest page; it does not resume paging.
+
+    A plain page_fetch here would read from the stored cursor and march the
+    profile further back through history, which is not what pressing sync
+    means. The refresh is flagged so handle_page_fetch leaves the cursor be.
+    """
     ctx.adapter.add_profile("nike")
 
     handlers.handle_profile_sync(ctx, {"username": "nike"})
@@ -58,7 +64,10 @@ def test_profile_sync_enqueues_first_page_only_once(ctx):
     ctx.enqueued.clear()
     handlers.handle_profile_sync(ctx, {"username": "nike"})
 
-    assert ctx.enqueued == []
+    assert ctx.enqueued == [("page_fetch", {"username": "nike", "from_front": True})]
+    assert ctx.conn.execute(
+        "SELECT next_cursor FROM profiles WHERE username='nike'"
+    ).fetchone()["next_cursor"] == "7"
 
 
 def test_profile_sync_restarts_an_exhausted_walk(ctx):
@@ -327,5 +336,69 @@ def test_page_fetch_still_downloads_when_the_file_is_gone(ctx, settings):
     ).fetchone() is not None
 
 
+def test_sync_refreshes_the_newest_page_without_moving_the_walk(ctx):
+    """The cursor only ever moves away from recent posts.
+
+    Business Discovery serves newest-first, so a profile's most recent posts
+    are the ones it indexed first. Whatever those rows were missing at the time
+    -- engagement counts, most visibly -- nothing ever came back for, which is
+    why the trending day window read zero on every row.
+    """
+    ctx.adapter.add_profile("nike", post_count=10)
+    ctx.adapter.add_posts("nike", count=10)
+    handlers.handle_profile_sync(ctx, {"username": "nike"})
+    handlers.handle_page_fetch(ctx, {"username": "nike"})
+    part_way = ctx.conn.execute(
+        "SELECT next_cursor FROM profiles WHERE username='nike'"
+    ).fetchone()["next_cursor"]
+    assert part_way not in (None, ""), "the walk should be part-way through"
+
+    ctx.enqueued.clear()
+    handlers.handle_profile_sync(ctx, {"username": "nike"})
+
+    assert ("page_fetch", {"username": "nike", "from_front": True}) in ctx.enqueued
+
+    handlers.handle_page_fetch(ctx, {"username": "nike", "from_front": True})
+
+    after = ctx.conn.execute(
+        "SELECT next_cursor FROM profiles WHERE username='nike'"
+    ).fetchone()["next_cursor"]
+    assert after == part_way, "a refresh must not move the walk"
 
 
+def test_a_front_refresh_updates_engagement_on_rows_already_indexed(ctx):
+    ctx.adapter.add_profile("nike", post_count=3)
+    ctx.adapter.add_posts("nike", count=3)
+    handlers.handle_profile_sync(ctx, {"username": "nike"})
+    handlers.handle_page_fetch(ctx, {"username": "nike"})
+
+    shortcode = ctx.conn.execute(
+        "SELECT shortcode FROM media_items WHERE username='nike' ORDER BY taken_at DESC"
+    ).fetchone()["shortcode"]
+    # The state a row indexed before engagement capture is stuck in.
+    ctx.conn.execute(
+        "UPDATE media_items SET like_count=NULL, comments_count=NULL WHERE shortcode=?",
+        (shortcode,),
+    )
+
+    handlers.handle_page_fetch(ctx, {"username": "nike", "from_front": True})
+
+    row = ctx.conn.execute(
+        "SELECT like_count FROM media_items WHERE shortcode=?", (shortcode,)
+    ).fetchone()
+    assert row["like_count"] is not None
+
+
+def test_an_exhausted_profile_still_restarts_at_the_front(ctx):
+    ctx.adapter.add_profile("nike", post_count=2)
+    ctx.adapter.add_posts("nike", count=2)
+    handlers.handle_profile_sync(ctx, {"username": "nike"})
+    ctx.conn.execute("UPDATE profiles SET next_cursor='' WHERE username='nike'")
+
+    ctx.enqueued.clear()
+    handlers.handle_profile_sync(ctx, {"username": "nike"})
+
+    assert ("page_fetch", {"username": "nike"}) in ctx.enqueued
+    assert ctx.conn.execute(
+        "SELECT next_cursor FROM profiles WHERE username='nike'"
+    ).fetchone()["next_cursor"] is None
