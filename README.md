@@ -1,120 +1,93 @@
-# instascraper
+# 📸 instascraper
 
-Local, single-user tool for browsing public Instagram profiles and pulling
-media at full quality into a folder on this machine.
+> Local, single-user tool for browsing public Instagram profiles and saving their media at full quality.
 
-- Design: `docs/superpowers/specs/2026-08-23-instascraper-design.md`
-- Plan: `docs/superpowers/plans/2026-08-23-instascraper.md`
+**A FastAPI and Next.js app that reads public Business and Creator accounts through Meta's Business Discovery API, with every Instagram-facing call funnelled through one paced worker thread so request serialization is structural, not a convention.**
 
-## How it works
+<!-- readme-header -->
+![Python](https://img.shields.io/badge/-Python-555) ![FastAPI](https://img.shields.io/badge/-FastAPI-555) ![SQLite](https://img.shields.io/badge/-SQLite-555) ![Next.js](https://img.shields.io/badge/-Next.js_15-555) ![Ant Design](https://img.shields.io/badge/-Ant_Design_6-555) ![Docker](https://img.shields.io/badge/-Docker_Compose-555) ![yt-dlp](https://img.shields.io/badge/-yt--dlp-555)
 
-Two containers. `web` is Next.js and proxies `/api/*` to `api`. `api` is
-FastAPI on uvicorn with `--workers 1`, running the HTTP event loop plus
-exactly one fetch worker thread. That worker thread is the only code that
-talks to Instagram, which makes request serialization structural rather than
-a convention. All Meta Graph API usage is confined to `api/app/ig/`, so an
-Instagram-side breakage has a one-directory blast radius.
+## What it does
 
-Data comes from Meta's Business Discovery API, which sees **public Business
-and Creator accounts only**. Personal accounts are invisible to it, and no
-workaround exists -- that is a property of the API, not a missing feature.
+- **Browse a profile.** Look up a username, see a contact-sheet grid of metadata and thumbnails, load more, and track accounts. Full-resolution media is fetched only when you select posts and press Download, then cached.
+- **Download** selected posts into `OUT_DIR` as `base_01.jpg`, `base_02.mp4`; carousel slides get letter suffixes (`base_07a.jpg`). Reel video, which Business Discovery does not serve, comes from `yt-dlp` under a hard per-run cap.
+- **Paste a post link** (`/direct`). The owner's handle is read from the public embed page, then the Graph API supplies the pictures.
+- **Trending hashtags.** Ranks tags in your cached captions over the last 24 hours and 7 days by the summed likes, comments and views of the posts carrying them. Views exist only on reels, so reels weigh more.
+- **Recreate queue.** Mark posts, prepare a payload (files on disk), and submit it to [instacreator](https://github.com/sathwikbairaboina2/instacreator)'s SQS queue. A status moves `selected`, `prepared`, `submitted`, and `submitted` is set only after the queue accepted the message. The handoff answers 503 when `SQS_ENDPOINT` is empty.
+- **Self-protection.** A circuit breaker, pacing floors between Graph and CDN calls, a usage-limit stop, and a banner for rate limits, an invalid token or a missing token.
+- **Fake adapter** (`IG_ADAPTER=fake`) for running the whole stack and the e2e suite with no network.
 
-Profile lookups fetch metadata and thumbnails. Full-resolution media is
-fetched only when you select something and press Download, then cached
-forever.
+Limit worth knowing: Business Discovery sees **public Business and Creator accounts only**. Personal accounts are invisible to it; that is a property of the API.
 
-## Setup
+## Architecture
 
-    cp .env.example .env      # fill in the IG_GRAPH_* values and OUT_DIR
-    docker compose build
-    docker compose up -d
+```mermaid
+flowchart LR
+    B[browser] --> W[web<br/>Next.js :3000]
+    W -->|/api/*| A[api<br/>FastAPI, 1 uvicorn worker]
+    A --> Q[(SQLite + media cache)]
+    A --> T[fetch worker thread<br/>pacer + breaker]
+    T --> G[Meta Graph API<br/>Business Discovery]
+    T --> C[Instagram CDN]
+    T -.reels, embed pages.-> I[instagram.com]
+    A -->|submit| S[(instacreator SQS queue)]
+```
 
-Open http://localhost:3000.
+`api` runs the HTTP loop plus exactly one fetch worker thread, and that thread is the only code that talks to Instagram. All Graph API usage is confined to `api/app/ig/`, and `api/app/ig/graph_map.py` is the one file that should need changes when Meta reshapes a response.
+
+## Quickstart
+
+```bash
+cp .env.example .env      # fill in IG_GRAPH_TOKEN, IG_GRAPH_USER_ID, IG_GRAPH_VERSION, OUT_DIR
+docker compose build
+docker compose up -d      # open http://localhost:3000
+```
 
 ### Getting the Graph credentials
 
-Business Discovery reads other accounts through an account of your own, so
-there is a one-time setup. None of it can be automated.
+One-time setup, none of it automatable:
 
-1. Convert an Instagram account to **Business** or **Creator**.
-2. Create or choose a **Facebook Page**, and link the Instagram account to
-   it. Business Discovery is only available through the Facebook-Login
-   flavour of the API, so this link is mandatory.
-3. Create a **Meta developer app** at developers.facebook.com and add the
-   Instagram product.
-4. Grant the token `instagram_basic`, `pages_show_list`,
-   `pages_read_engagement` and `business_management`.
-5. Find your Instagram user id: `GET /me/accounts` for the Page id, then
-   `GET /{page-id}?fields=instagram_business_account`.
-6. Prefer a **Business Manager system-user token**, which does not expire,
-   over a long-lived user token, which expires after 60 days.
+1. Convert an Instagram account to Business or Creator.
+2. Link it to a Facebook Page (Business Discovery is only available through the Facebook-Login flavour of the API).
+3. Create a Meta developer app and add the Instagram product.
+4. Grant the token `instagram_basic`, `pages_show_list`, `pages_read_engagement` and `business_management`.
+5. Find your Instagram user id: `GET /me/accounts` for the Page id, then `GET /{page-id}?fields=instagram_business_account`.
+6. Prefer a Business Manager system-user token (does not expire) over a long-lived user token (60 days).
 
-Put the results in `.env` as `IG_GRAPH_TOKEN`, `IG_GRAPH_USER_ID` and
-`IG_GRAPH_VERSION`, then verify without starting the stack:
+Verify without starting the stack:
 
-    cd api && IG_GRAPH_TOKEN=... python -m pytest tests/test_live_canary.py -v
+```bash
+cd api && IG_GRAPH_TOKEN=... python -m pytest tests/test_live_canary.py -v
+```
 
-## Everyday use
+If grids go empty or errors turn odd, run the canary; a failure means `graph_map.py` needs updating. Re-record fixtures first with `cd api && python scripts/capture_graph_fixtures.py nike`.
 
-Enter a username, browse the grid, click tiles to select (shift-click for a
-range), type a base filename, and press Download. Files land in `OUT_DIR`
-named `base_01.jpg`, `base_02.mp4`, and so on. Carousel slides get letter
-suffixes: `base_07a.jpg`, `base_07b.jpg`.
+### Tests and local development
 
-Keep the tab open while a download runs — the browser drives the flow. If you
-close it, the media that was already fetched stays cached, so re-selecting
-finishes immediately.
+```bash
+cd api && python -m pytest        # backend, in-memory fake adapter, no network
+bash scripts/e2e-native.sh        # full stack on the host, no Docker
+bash scripts/e2e.sh               # same suite through Compose
+```
 
-**Trending** ranks the hashtags in your cached captions over two windows: the
-last 24 hours and the last 7 days. A tag's score is the likes, comments and
-views of every cached post carrying it, added together, so a tag that several
-decent posts share outranks one that rode a single hit. Expand a row to see
-those posts and send any of them to the recreate queue.
+For development without Docker: `python -m venv .venv`, `.venv/Scripts/python -m pip install -r api/requirements.txt`, `cd web && npm install`, then `scripts/e2e-native.sh` or start `uvicorn app.main:app --port 8000 --workers 1` (with `DB_PATH`, `MEDIA_DIR`, `OUT_DIR_CONTAINER`) and `API_ORIGIN=http://127.0.0.1:8000 npm run dev` in `web/`.
 
-Two things worth knowing before you read the numbers. Views exist on reels
-and nowhere else, so reels weigh more heavily than photos in the total. And
-the day window is only as full as your cache — nothing published in the last
-24 hours has been synced means an empty feed, which the page says outright
-rather than leaving you to guess.
+## Configuration
 
-## When the banner appears
+Names from `.env.example`, all documented there: `IG_GRAPH_TOKEN`, `IG_GRAPH_USER_ID`, `IG_GRAPH_VERSION` (required, never defaulted), `IG_GRAPH_REFRESH_PAGES`, `IG_GRAPH_USAGE_LIMIT`, `OUT_DIR`, `FIRST_PAGE_SIZE`, `PAGE_SIZE`, `IG_MIN_INTERVAL`, `IG_CDN_MIN_INTERVAL`, `IG_BACKOFF`, `IG_ADAPTER` (`graph` or `fake`). Compose also reads `SQS_ENDPOINT` (default: instacreator's ElasticMQ on host port 24104).
 
-- **Rate limited** — the worker paused itself. Nothing to do; it resumes.
-- **Token invalid** — the token expired or was revoked. Issue a new one,
-  update `.env`, restart, then press "I have fixed it" in the banner.
-- **Token not configured** — `IG_GRAPH_TOKEN` is empty. See Setup above.
-- **Empty grids and odd errors** — Instagram probably rotated something.
-  Run the canary:
+## Project layout
 
-      cd api && IG_GRAPH_TOKEN=... python -m pytest tests/test_live_canary.py -v
+```
+api/app/ig/        Graph adapter, fake adapter, reel downloader, embed-page reader
+api/app/worker/    single fetch worker: queue, pacer, breaker, sweep
+api/app/routes/    profiles, media, downloads, urls, hashtags, recreate, activity, health, status
+api/app/services/  downloads, hashtags, quota, submit (SQS handoff), activity
+web/app/           pages: profile (/p/<user>), /direct, /trending, /recreate, /activity
+docs/              handbook, bug log, specs and plans in docs/superpowers/
+CHANGELOG.md       what shipped and why
+```
 
-  A failure there means `api/app/ig/graph_map.py` needs updating -- it is
-  the only file that should ever need to change when Meta reshapes a
-  response. Re-record the fixtures first:
+## Status
 
-      cd api && python scripts/capture_graph_fixtures.py nike
-
-## Tests
-
-    cd api && python -m pytest        # backend, no network
-    bash scripts/e2e-native.sh        # full stack on the host, no Docker
-    bash scripts/e2e.sh               # same suite via Compose
-    cd api && IG_GRAPH_TOKEN=... python -m pytest tests/test_live_canary.py
-
-The backend suite runs against an in-memory fake adapter and never touches
-the network. The e2e suite seeds a throwaway database under `.e2e/` and runs
-the whole stack with `IG_ADAPTER=fake`.
-
-### Local development without Docker
-
-    python -m venv .venv
-    .venv/Scripts/python -m pip install -r api/requirements.txt
-    cd web && npm install
-
-Then use `scripts/e2e-native.sh`, or start the two processes by hand:
-
-    cd api && DB_PATH=../data/app.db MEDIA_DIR=../data/media \
-      OUT_DIR_CONTAINER=../downloads \
-      ../.venv/Scripts/python -m uvicorn app.main:app --port 8000 --workers 1
-
-    cd web && API_ORIGIN=http://127.0.0.1:8000 npm run dev
+Personal tool, running locally; no CI workflow and no license file. `docs/bugs-2026-08-25.md` records the last soak findings. This README was checked against the code and file layout; the backend and e2e suites were not run for this revision.
