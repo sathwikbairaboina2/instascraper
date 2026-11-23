@@ -10,6 +10,8 @@ services:
       # disables the handoff and /api/recreate/{sc}/submit answers 503.
       SQS_ENDPOINT: ${SQS_ENDPOINT:-http://host.docker.internal:24104}
       SQS_QUEUE: recreate-jobs
+      RESYNC_INTERVAL_HOURS: ${RESYNC_INTERVAL_HOURS:-24}
+      RESYNC_CHECK_SECONDS: ${RESYNC_CHECK_SECONDS:-300}
     volumes:
       - ./data:/data
       - ${OUT_DIR:-./downloads}:/out

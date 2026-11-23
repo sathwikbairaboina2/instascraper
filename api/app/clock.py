@@ -8,3 +8,7 @@ def now_iso() -> str:
 
 def monotonic() -> float:
     return time.monotonic()
+
+
+def now() -> datetime:
+    return datetime.now(timezone.utc)

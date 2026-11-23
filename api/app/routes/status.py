@@ -7,6 +7,7 @@ from app.ig.factory import make_adapter
 from app.main_deps import get_conn_dep
 from app.services import quota
 from app.worker import queue
+from app.worker.resync import due_profiles
 
 router = APIRouter()
 
@@ -26,6 +27,14 @@ def get_status(request: Request, conn=Depends(get_conn_dep)):
         "hour": quota.window(conn, quota.REEL, 3600, settings.reel_max_per_hour, now),
         "day": quota.window(conn, quota.REEL, 86400, settings.reel_max_per_day, now),
     }
+    next_due = None
+    if settings.resync_interval_hours > 0:
+        due = due_profiles(conn, now, settings.resync_interval_hours)
+        if due:
+            row = conn.execute(
+                "SELECT last_synced_at FROM profiles WHERE username=?", (due[0],)
+            ).fetchone()
+            next_due = {"username": due[0], "last_synced_at": row["last_synced_at"]}
     return {
         "worker": "running" if worker is not None and worker.is_alive() else "stopped",
         "adapter": current.name,
@@ -34,6 +43,11 @@ def get_status(request: Request, conn=Depends(get_conn_dep)):
         "queue_depth": queue.depth(conn),
         "usage": usage,
         "reel_limits": reel_limits,
+        "resync": {
+            "interval_hours": settings.resync_interval_hours,
+            "check_seconds": settings.resync_check_seconds,
+            "next_due": next_due,
+        },
     }
 
 

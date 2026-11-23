@@ -128,3 +128,36 @@ def test_status_reports_both_reel_windows(client):
     assert body["reel_limits"]["hour"]["max"] == 20
     assert body["reel_limits"]["day"]["max"] == 100
     assert body["reel_limits"]["hour"]["used"] == 0
+
+
+def test_status_reports_resync_with_next_due(client, conn):
+    conn.execute(
+        "INSERT INTO profiles (username, tracked, last_synced_at, created_at)"
+        " VALUES ('old', 1, '2020-01-01T00:00:00+00:00', 'x'),"
+        " ('never', 1, NULL, 'x'), ('loose', 0, NULL, 'x')"
+    )
+    body = client.get("/api/status").json()["resync"]
+    assert body["interval_hours"] == 24.0
+    assert body["check_seconds"] == 300.0
+    assert body["next_due"] == {"username": "never", "last_synced_at": None}
+
+
+def test_status_resync_next_due_is_null_when_nothing_is_due(client):
+    assert client.get("/api/status").json()["resync"]["next_due"] is None
+
+
+def test_status_resync_next_due_is_null_when_disabled(client, conn):
+    from dataclasses import replace
+
+    conn.execute("INSERT INTO profiles (username, tracked, created_at) VALUES ('a', 1, 'x')")
+    holder = client.app_state.runtime
+    holder.swap(
+        type(holder.current)(
+            holder.current.name,
+            replace(holder.current.settings, resync_interval_hours=0.0),
+            holder.current.adapter,
+        )
+    )
+    body = client.get("/api/status").json()["resync"]
+    assert body["interval_hours"] == 0.0
+    assert body["next_due"] is None

@@ -5,12 +5,13 @@ import time
 from dataclasses import dataclass
 from typing import Callable
 
-from app import db
+from app import clock, db
 from app.config import Settings
 from app.ig import types as t
 from app.worker import queue
 from app.worker.breaker import Breaker
 from app.worker.pacer import Pacer
+from app.worker.resync import resync_tick
 
 log = logging.getLogger("worker")
 
@@ -51,6 +52,7 @@ class Worker(threading.Thread):
         self.handlers = handlers
         self.wake = threading.Event()
         self.stop_flag = threading.Event()
+        self._next_resync: float | None = None
 
     # ---- lifecycle -----------------------------------------------------
     def shutdown(self, timeout: float = 5.0) -> None:
@@ -74,18 +76,47 @@ class Worker(threading.Thread):
             current = self.runtime.current
             conn = db.get_conn(current.settings)
 
+            self._maybe_resync(conn, current.settings)
+
             wait = self.breaker.wait_seconds()
             if wait > 0:
-                self.stop_flag.wait(min(wait, IDLE_TIMEOUT))
+                self.stop_flag.wait(min(wait, IDLE_TIMEOUT, self._until_resync(current.settings)))
                 continue
 
             job = queue.claim_next(conn)
             if job is None:
-                self.wake.wait(IDLE_TIMEOUT)
+                self.wake.wait(min(IDLE_TIMEOUT, self._until_resync(current.settings)))
                 self.wake.clear()
                 continue
 
             self._run_job(conn, current, job)
+
+    # ---- scheduled resync ----------------------------------------------
+    def _until_resync(self, settings: Settings) -> float:
+        if settings.resync_interval_hours <= 0 or self._next_resync is None:
+            return IDLE_TIMEOUT
+        return max(0.01, self._next_resync - time.monotonic())
+
+    def _maybe_resync(self, conn, settings: Settings) -> None:
+        """Queue one overdue tracked profile at most every resync_check_seconds.
+
+        Reads the live settings each pass, so it follows the adapter toggle.
+        """
+        if settings.resync_interval_hours <= 0:
+            self._next_resync = None
+            return
+        now = time.monotonic()
+        if self._next_resync is None:
+            # First look shortly after start rather than a full period later.
+            self._next_resync = now + min(1.0, settings.resync_check_seconds)
+        if now < self._next_resync:
+            return
+        self._next_resync = now + settings.resync_check_seconds
+        try:
+            if resync_tick(conn, settings, self.breaker, clock.now()) is not None:
+                self.wake.set()
+        except Exception:  # noqa: BLE001 - a scheduler bug must not kill the worker
+            log.exception("resync tick failed")
 
     def _run_job(self, conn, current, job) -> None:
         payload = json.loads(job["payload"])

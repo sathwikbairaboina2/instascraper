@@ -1,3 +1,5 @@
+import time
+
 import pytest
 
 from app.ig import types as t
@@ -224,3 +226,65 @@ def test_a_spent_local_cap_fails_the_job_without_tripping_the_breaker(worker_env
     assert row["status"] == "failed"
     assert "cap spent" in row["error"]
     assert breaker.state()["tripped"] is False
+
+
+def test_stale_tracked_profile_is_resynced_without_any_request(worker_env):
+    from dataclasses import replace
+
+    from app.clock import now_iso
+
+    settings, conn, adapter, breaker, pacer = worker_env
+    settings = replace(settings, resync_interval_hours=1.0, resync_check_seconds=0.05)
+    conn.execute(
+        "INSERT INTO profiles (username, tracked, last_synced_at, created_at)"
+        " VALUES ('nike', 1, '2020-01-01T00:00:00+00:00', ?)",
+        (now_iso(),),
+    )
+    seen = []
+
+    def sync(ctx, payload):
+        seen.append(payload)
+        ctx.conn.execute(
+            "UPDATE profiles SET last_synced_at=? WHERE username=?",
+            (now_iso(), payload["username"]),
+        )
+
+    worker = Worker(
+        RuntimeConfig.fixed(settings, adapter),
+        breaker,
+        pacer,
+        Pacer(min_interval=0.0),
+        {"profile_sync": sync},
+    )
+    worker.start()
+    deadline = time.monotonic() + 5
+    while not seen and time.monotonic() < deadline:
+        time.sleep(0.02)
+    worker.shutdown()
+
+    assert seen == [{"username": "nike"}]
+    assert conn.execute(
+        "SELECT COUNT(*) c FROM activity_log WHERE action='resync'"
+    ).fetchone()["c"] == 1
+
+
+def test_resync_off_when_interval_is_zero(worker_env):
+    from dataclasses import replace
+
+    settings, conn, adapter, breaker, pacer = worker_env
+    settings = replace(settings, resync_interval_hours=0.0, resync_check_seconds=0.05)
+    conn.execute(
+        "INSERT INTO profiles (username, tracked, created_at) VALUES ('nike', 1, 'x')"
+    )
+    worker = Worker(
+        RuntimeConfig.fixed(settings, adapter),
+        breaker,
+        pacer,
+        Pacer(min_interval=0.0),
+        {"profile_sync": lambda ctx, p: None},
+    )
+    worker.start()
+    time.sleep(0.4)
+    worker.shutdown()
+    assert queue.depth(conn) == 0
+    assert conn.execute("SELECT COUNT(*) c FROM jobs").fetchone()["c"] == 0

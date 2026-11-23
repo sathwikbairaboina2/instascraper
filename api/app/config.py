@@ -27,6 +27,10 @@ class Settings:
     # endpoint means the handoff is off and submit answers 503.
     sqs_endpoint: str = ""
     sqs_queue: str = "recreate-jobs"
+    # Scheduled re-sync of tracked profiles. 0 hours turns it off. The worker
+    # looks at most every check_seconds and queues one profile per look.
+    resync_interval_hours: float = 24.0
+    resync_check_seconds: float = 300.0
 
 
 def load_settings() -> Settings:
@@ -64,4 +68,6 @@ def load_settings() -> Settings:
         reel_min_interval=float(os.environ.get("IG_REEL_MIN_INTERVAL", "20")),
         sqs_endpoint=os.environ.get("SQS_ENDPOINT", ""),
         sqs_queue=os.environ.get("SQS_QUEUE", "recreate-jobs"),
+        resync_interval_hours=float(os.environ.get("RESYNC_INTERVAL_HOURS", "24")),
+        resync_check_seconds=float(os.environ.get("RESYNC_CHECK_SECONDS", "300")),
     )
