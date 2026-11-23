@@ -1,7 +1,9 @@
+import json
+import os
 import struct
 import time
 import zlib
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -129,6 +131,47 @@ class FakeAdapter:
                 )
             )
 
+    def add_post(
+        self,
+        username: str,
+        caption: str,
+        kind: str = "image",
+        child_count: int = 1,
+        hours_ago: float | None = None,
+    ) -> None:
+        """Append one post with a caption kept exactly as given.
+
+        Shortcodes follow add_posts (`{username}-{i}`), so a dataset file and
+        a test that builds the same account by hand agree on identifiers.
+        """
+        bucket = self.posts.setdefault(username, [])
+        i = len(bucket)
+        shortcode = f"{username}-{i}"
+        video = kind == "reel"
+        if kind == "carousel" and child_count < 2:
+            child_count = 2
+        if kind != "carousel":
+            child_count = 1
+        if hours_ago is None:
+            taken = f"2026-01-{(i % 28) + 1:02d}T00:00:00+00:00"
+        else:
+            taken = (self.started_at - timedelta(hours=hours_ago)).isoformat()
+        bucket.append(
+            t.IgPost(
+                shortcode=shortcode,
+                kind=kind,
+                taken_at_iso=taken,
+                caption=caption,
+                is_video=video,
+                child_count=child_count,
+                thumb_url=f"https://cdn.test/{shortcode}/thumb.jpg",
+                ig_url=f"https://instagram.com/p/{shortcode}/",
+                like_count=100 + i * 37,
+                comments_count=5 + i * 3,
+                view_count=5000 + i * 911 if video else None,
+            )
+        )
+
     def raise_on(self, method: str, exc: Exception) -> None:
         """Next call to `method` raises `exc`, once."""
         self._pending[method] = exc
@@ -240,8 +283,53 @@ class FakeAdapter:
         self._exit("login", started)
 
 
+def load_dataset(path: str | Path) -> FakeAdapter:
+    """Build a FakeAdapter from a JSON file.
+
+    Shape: {"profiles": [{"username", "full_name", "post_count"?, "posts":
+    [{"caption", "kind": "image"|"carousel"|"reel", "child_count"?,
+    "hours_ago"?}]}]}. Any problem raises ValueError naming the path, so a
+    typo in IG_FAKE_DATASET fails at startup instead of serving nothing.
+    """
+    path = Path(path)
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise ValueError(f"fake dataset {path}: cannot read it ({exc})") from exc
+    try:
+        profiles = data["profiles"]
+        if not isinstance(profiles, list):
+            raise TypeError("profiles must be a list")
+        adapter = FakeAdapter()
+        for entry in profiles:
+            username = entry["username"]
+            posts = entry.get("posts", [])
+            adapter.add_profile(username, post_count=entry.get("post_count", len(posts)))
+            if entry.get("full_name"):
+                adapter.profiles[username] = replace(
+                    adapter.profiles[username], full_name=entry["full_name"]
+                )
+            adapter.posts.setdefault(username, [])
+            for n, post in enumerate(posts):
+                kind = post.get("kind", "image")
+                if kind not in ("image", "carousel", "reel"):
+                    raise ValueError(f"unknown kind {kind!r}")
+                adapter.add_post(
+                    username,
+                    caption=post["caption"],
+                    kind=kind,
+                    child_count=int(post.get("child_count", 1)),
+                    hours_ago=float(post.get("hours_ago", 2 + n)),
+                )
+    except (KeyError, TypeError, ValueError, AttributeError) as exc:
+        raise ValueError(f"fake dataset {path}: bad shape ({exc!r})") from exc
+    return adapter
+
+
 def seeded_adapter() -> FakeAdapter:
     """The canonical fake dataset.
+
+    IG_FAKE_DATASET=<json file> swaps it for load_dataset(file).
 
     Shared by scripts/seed_e2e.py and by make_adapter() when IG_ADAPTER=fake,
     so a fake-adapter stack can actually serve the media it seeded. Without a
@@ -251,6 +339,9 @@ def seeded_adapter() -> FakeAdapter:
     Dates are relative because the trending feed asks "in the last 24
     hours", and a dataset pinned to January can only ever answer "nothing".
     """
+    dataset = os.environ.get("IG_FAKE_DATASET")
+    if dataset:
+        return load_dataset(dataset)
     adapter = FakeAdapter()
     adapter.add_profile("nike", post_count=8)
     # Today: two tags, overlapping, so the day feed has a ranking to show.
