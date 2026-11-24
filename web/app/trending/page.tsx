@@ -79,7 +79,7 @@ function TagPosts({ tag, window }: { tag: string; window: TrendWindow }) {
     })
 
   return (
-    <div data-testid={`trending-posts-${tag}`} style={{ padding: '10px 0 14px 36px' }}>
+    <div className="trend-posts" data-testid={`trending-posts-${tag}`} style={{ padding: '10px 0 14px 36px' }}>
       <Flex wrap gap={8}>
         {posts.map((p) => (
           <button
@@ -179,7 +179,7 @@ export default function TrendingPage() {
   return (
     <AppShell>
       <Content style={{ padding: 24, overflowY: 'auto' }}>
-        <Flex align="center" justify="space-between" style={{ marginBottom: 16 }}>
+        <Flex align="center" justify="space-between" gap={12} wrap style={{ marginBottom: 16 }}>
           <Title level={4} style={{ margin: 0 }}>
             Trending hashtags
           </Title>
@@ -221,6 +221,7 @@ export default function TrendingPage() {
           {items.map((row, i) => (
             <div key={row.tag}>
               <Flex
+                className="trend-row"
                 data-testid={`trending-row-${row.tag}`}
                 align="center"
                 gap={12}
@@ -234,7 +235,7 @@ export default function TrendingPage() {
                 <Text type="secondary" style={{ width: 24, textAlign: 'right' }}>
                   {i + 1}
                 </Text>
-                <Text strong style={{ flex: 1 }} data-testid={`trending-expand-${row.tag}`}>
+                <Text strong style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere' }} data-testid={`trending-expand-${row.tag}`}>
                   #{row.tag}
                 </Text>
                 <Text type="secondary" style={{ fontSize: 12 }}>

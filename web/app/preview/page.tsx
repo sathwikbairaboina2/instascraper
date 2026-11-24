@@ -297,8 +297,8 @@ function Screen({
   const railBg = token.colorBgContainer
 
   return (
-    <Layout style={{ height: '100dvh', overflow: 'hidden' }}>
-      <Sider width={230} style={{ background: railBg, borderRight: `1px solid ${token.colorBorderSecondary}` }}>
+    <Layout className="pv-root" style={{ height: '100dvh', overflow: 'hidden' }}>
+      <Sider className="pv-sider" width={230} style={{ background: railBg, borderRight: `1px solid ${token.colorBorderSecondary}` }}>
         <Flex vertical style={{ height: '100%' }}>
           <Flex align="center" gap={9} style={{ height: 52, padding: '0 16px', flex: 'none' }}>
             <ThunderboltFilled style={{ color: token.colorPrimary, fontSize: 15 }} />
@@ -357,8 +357,10 @@ function Screen({
       <Layout>
         {/* theme switcher, part of the proposal rather than the product */}
         <Flex
+          className="pv-bar"
           align="center"
           gap={8}
+          wrap
           style={{
             flex: 'none',
             padding: '7px 16px',
@@ -389,8 +391,10 @@ function Screen({
         </Flex>
 
         <Flex
+          className="pv-bar"
           align="center"
           gap={12}
+          wrap
           style={{
             height: 56,
             padding: '0 16px',
@@ -417,6 +421,7 @@ function Screen({
         </Flex>
 
         <Flex
+          className="pv-bar"
           align="center"
           gap={10}
           wrap
@@ -455,7 +460,7 @@ function Screen({
           <Button size="small" onClick={() => setSelected(visible.map((i) => i.code))}>Select all</Button>
         </Flex>
 
-        <Layout style={{ overflow: 'hidden', flex: 1, minHeight: 0 }}>
+        <Layout className="pv-body" style={{ overflow: 'hidden', flex: 1, minHeight: 0 }}>
           <Content style={{ overflowY: 'auto', padding: 16, background: token.colorBgLayout }}>
             {visible.length === 0 ? (
               <Empty description="No posts match these filters" style={{ marginTop: 90 }}>
@@ -485,6 +490,7 @@ function Screen({
           </Content>
 
           <Sider
+            className="pv-inspector"
             width={300}
             style={{
               background: token.colorBgContainer,
@@ -582,8 +588,10 @@ function Screen({
         </Layout>
 
         <Flex
+          className="pv-bar"
           align="center"
           gap={12}
+          wrap
           style={{
             flex: 'none',
             padding: '10px 16px',

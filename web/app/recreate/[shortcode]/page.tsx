@@ -213,13 +213,13 @@ export default function RecreateItemPage({
     <AppShell>
       <Content style={{ padding: '20px 24px', overflowY: 'auto' }}>
         <Link href="/recreate">
-          <Button size="small" type="text" icon={<ArrowLeftOutlined />} style={{ marginBottom: 14 }}>
+          <Button size="small" type="text" className="back-btn" icon={<ArrowLeftOutlined />} style={{ marginBottom: 14 }}>
             Recreate
           </Button>
         </Link>
 
-        <Flex gap={20} align="flex-start" wrap>
-          <Flex vertical gap={7} style={{ width: 300, flex: 'none' }}>
+        <Flex className="rc-cols" gap={20} align="flex-start" wrap>
+          <Flex className="rc-media" vertical gap={7} style={{ width: 300, flex: 'none' }}>
             <BigSlide
               shortcode={shortcode}
               child={focus}
@@ -245,11 +245,11 @@ export default function RecreateItemPage({
             )}
           </Flex>
 
-          <Flex vertical gap={12} style={{ flex: 1, minWidth: 300 }}>
-            <Flex align="center" gap={10}>
+          <Flex className="rc-main" vertical gap={12} style={{ flex: 1, minWidth: 300 }}>
+            <Flex align="center" gap={10} wrap>
               <Title level={5} style={{ margin: 0 }}>{item?.username}</Title>
               {item && <Tag data-testid="item-status">{item.status}</Tag>}
-              <Button size="small" type="text" icon={<LinkOutlined />} href={item?.ig_url} target="_blank">
+              <Button size="small" type="text" className="inline-act" icon={<LinkOutlined />} href={item?.ig_url} target="_blank">
                 Source
               </Button>
             </Flex>
@@ -325,7 +325,7 @@ export default function RecreateItemPage({
               </Flex>
             )}
 
-            <Flex gap={10} align="center">
+            <Flex gap={10} align="center" wrap>
               <Button
                 type="primary"
                 data-testid="prepare"

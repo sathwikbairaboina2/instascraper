@@ -15,6 +15,7 @@ import { useState } from 'react'
 import type { MediaSummary } from '@/lib/api'
 import { compactCount } from '@/lib/format'
 import { GRADIENT_LINEAR } from '@/lib/themes'
+import { useNoHover } from '@/lib/useMedia'
 
 import CopyUrlButton from './CopyUrlButton'
 
@@ -62,9 +63,13 @@ export default function MediaTile({
   onOpen?: () => void
 }) {
   const { token } = theme.useToken()
-  const [hover, setHover] = useState(false)
+  const [hoverRaw, setHover] = useState(false)
+  // Touch has no hover: the engagement row is always on, and a tap must not
+  // leave the tile lifted until the next one.
+  const touch = useNoHover()
+  const hover = hoverRaw && !touch
   const busy = item.full_status === 'fetching' || item.full_status === 'queued'
-  const show = hover || selected
+  const show = hover || selected || touch
 
   return (
     <div
@@ -131,7 +136,7 @@ export default function MediaTile({
           }}
         />
 
-        <Space size={4} style={{ position: 'absolute', top: 8, left: 38 }}>
+        <Space className="tile-pills" size={4} style={{ position: 'absolute', top: 8, left: 38 }}>
           {item.kind === 'carousel' && pill(item.child_count)}
           {(item.kind === 'reel' || item.kind === 'video') && pill(item.kind)}
         </Space>
@@ -146,6 +151,7 @@ export default function MediaTile({
           <Flex
             gap={9}
             align="center"
+            className={item.full_status === 'ready' ? 'tile-eng-ready' : undefined}
             data-testid={`engagement-${item.shortcode}`}
             style={{
               position: 'absolute',
@@ -208,7 +214,7 @@ export default function MediaTile({
       {/* Controls sit outside the tile button: a button cannot nest a button,
           and nesting would swallow the selection click. */}
       {!openHref && (
-        <div style={{ position: 'absolute', top: 8, left: 8, opacity: show ? 1 : 0.55, transition: 'opacity .15s ease' }}>
+        <div className="tile-check" style={{ position: 'absolute', top: 8, left: 8, opacity: show ? 1 : 0.55, transition: 'opacity .15s ease' }}>
           <Checkbox checked={selected} onChange={() => onToggle(false)} />
         </div>
       )}
@@ -220,6 +226,7 @@ export default function MediaTile({
           size="small"
           type="text"
           shape="circle"
+          className="tile-act tile-act-preview"
           data-testid={`preview-${item.shortcode}`}
           aria-label={`Preview ${item.shortcode}`}
           icon={<ExpandOutlined />}
@@ -246,6 +253,7 @@ export default function MediaTile({
             size="small"
             type="text"
             shape="circle"
+            className={`tile-act tile-act-recreate`}
             data-testid={`recreate-${item.shortcode}`}
             aria-label={`${marked ? 'Remove' : 'Send'} ${item.shortcode} ${marked ? 'from' : 'to'} Recreate`}
             aria-pressed={marked}
@@ -267,6 +275,7 @@ export default function MediaTile({
       {item.full_status === 'ready' && (
         <CopyUrlButton
           shortcode={item.shortcode}
+          className={`tile-act tile-act-copy${onRecreate ? '' : ' no-recreate'}`}
           childIdxs={
             // Carousel slides are 1-based; a lone file lives at child 0.
             item.child_count > 1
@@ -302,6 +311,7 @@ export default function MediaTile({
             type="text"
             danger
             shape="circle"
+            className="tile-retry"
             data-testid={`retry-${item.shortcode}`}
             aria-label={`Retry ${item.shortcode}`}
             icon={<ReloadOutlined />}

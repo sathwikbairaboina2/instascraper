@@ -17,6 +17,7 @@ export default function CopyUrlButton({
   shortcode,
   childIdxs = [0],
   testId,
+  className,
   style,
 }: {
   shortcode: string
@@ -24,6 +25,7 @@ export default function CopyUrlButton({
   /** Override when several copies of the same shortcode share a page, e.g.
    *  the lightbox floating over the tile it was opened from. */
   testId?: string
+  className?: string
   style?: React.CSSProperties
 }) {
   const [copied, setCopied] = useState(false)
@@ -43,6 +45,7 @@ export default function CopyUrlButton({
         size="small"
         type="text"
         shape="circle"
+        className={className}
         data-testid={testId ?? `copy-url-${shortcode}`}
         aria-label={`Copy local URL${plural ? 's' : ''} of ${shortcode}`}
         icon={copied ? <CheckOutlined /> : <CopyOutlined />}

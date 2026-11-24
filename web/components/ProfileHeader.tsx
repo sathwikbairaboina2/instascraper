@@ -33,6 +33,7 @@ export default function ProfileHeader({
 
   return (
     <Flex
+      className="profile-head"
       align="flex-start"
       gap={20}
       style={{
@@ -51,11 +52,11 @@ export default function ProfileHeader({
       </div>
 
       <Flex vertical gap={7} style={{ flex: 1, minWidth: 0 }}>
-        <Title level={5} data-testid="profile-username" style={{ margin: 0 }}>
+        <Title level={5} data-testid="profile-username" style={{ margin: 0, overflowWrap: 'anywhere' }}>
           {profile?.username}
         </Title>
 
-        <Flex gap={22}>
+        <Flex className="profile-stats" gap={22}>
           <Stat testId="profile-stat-posts" label="posts" value={compactCount(profile?.post_count) ?? '—'} />
           <Stat
             testId="profile-stat-followers"
@@ -66,13 +67,13 @@ export default function ProfileHeader({
         </Flex>
 
         {profile?.biography && (
-          <Text style={{ fontSize: 12, color: tokens.textSecondary }}>{profile.biography}</Text>
+          <Text style={{ fontSize: 12, color: tokens.textSecondary, overflowWrap: 'anywhere' }}>{profile.biography}</Text>
         )}
       </Flex>
 
       {/* Track, sync and cache are things this app does, not things the
           profile is. They sit apart from Instagram's own furniture. */}
-      <Flex gap={6} align="center" style={{ flex: 'none' }}>
+      <Flex className="profile-actions" gap={6} align="center" style={{ flex: 'none' }}>
         {actions}
       </Flex>
     </Flex>

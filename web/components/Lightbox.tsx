@@ -62,6 +62,7 @@ export default function Lightbox({
   return (
     <Modal
       open
+      rootClassName="lightbox"
       onCancel={onClose}
       footer={null}
       width="min(1100px, 92vw)"
@@ -76,11 +77,12 @@ export default function Lightbox({
           {ready && (
             <CopyUrlButton
               shortcode={item.shortcode}
+              className="lightbox-act"
               childIdxs={[child]}
               testId="lightbox-copy-url"
             />
           )}
-          <Button size="small" icon={<LinkOutlined />} href={item.ig_url} target="_blank">
+          <Button size="small" className="lightbox-act" icon={<LinkOutlined />} href={item.ig_url} target="_blank">
             Instagram
           </Button>
         </Flex>
@@ -89,9 +91,9 @@ export default function Lightbox({
       <Flex vertical align="center" gap={12} data-testid="lightbox">
         {ready ? (
           childIsVideo ? (
-            <video data-testid="lightbox-video" src={src} controls autoPlay style={{ maxWidth: '100%', maxHeight: '72vh' }} />
+            <video data-testid="lightbox-video" src={src} controls autoPlay style={{ maxWidth: '100%', maxHeight: '72dvh' }} />
           ) : (
-            <img data-testid="lightbox-image" src={src} alt={item.shortcode} style={{ maxWidth: '100%', maxHeight: '72vh' }} />
+            <img data-testid="lightbox-image" src={src} alt={item.shortcode} style={{ maxWidth: '100%', maxHeight: '72dvh' }} />
           )
         ) : (
           <Flex vertical align="center" gap={12} data-testid="lightbox-placeholder">
@@ -99,7 +101,7 @@ export default function Lightbox({
               <img
                 src={item.thumb_url}
                 alt=""
-                style={{ maxHeight: '50vh', maxWidth: '100%', opacity: working ? 0.35 : 0.6, filter: 'blur(1px)' }}
+                style={{ maxHeight: '50dvh', maxWidth: '100%', opacity: working ? 0.35 : 0.6, filter: 'blur(1px)' }}
               />
               {working && (
                 <Spin

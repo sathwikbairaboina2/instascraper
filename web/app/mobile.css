@@ -1,0 +1,644 @@
+/* Phone and tablet layout.
+ *
+ * Desktop (1024 px and up) is the layout the inline styles describe, and
+ * nothing here applies to it: every rule sits inside a media query, and the
+ * phone-only pieces (top bar, selection bar, sheet chrome) are hidden by
+ * default. Layout is CSS rather than script so the server and the client
+ * render the same markup. The phone breakpoint is repeated in
+ * lib/useMedia.ts.
+ *
+ * The page scrolls as a whole on phones. The inline styles pin each screen
+ * to the viewport and scroll the grid inside it, which leaves a grid a few
+ * rows tall once the header, tabs and filters have taken their share.
+ * `!important` is needed where an inline style has to be overridden. */
+
+.app-topbar,
+.sel-bar,
+.sheet-mask,
+.sheet-head {
+  display: none;
+}
+
+@media (max-width: 1023px) {
+  /* Below desktop width the inspector rail is a sheet opened from a bar, so
+     the grid keeps the room. The tablet range keeps the sider, so the bar
+     starts after it. */
+  .sel-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 30;
+    min-height: 64px;
+    padding: 10px max(16px, env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  }
+
+  /* Below antd's modals (1000), so the lightbox opened from the sheet
+     still lands on top of it. */
+  .sheet-mask {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 890;
+    background: rgba(0, 0, 0, 0.5);
+    display: none;
+  }
+
+  .sheet-mask[data-open='true'] {
+    display: block;
+    animation: sheet-fade 0.2s ease;
+  }
+
+  .side-panel {
+    position: fixed !important;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 900;
+    flex: none !important;
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
+    max-height: 88dvh;
+    border-left: 0 !important;
+    border-radius: 16px 16px 0 0;
+    padding-bottom: env(safe-area-inset-bottom);
+    display: none !important;
+  }
+
+  .side-panel[data-open='true'] {
+    display: block !important;
+    animation: sheet-up 0.22s ease;
+  }
+
+  @keyframes sheet-up {
+    from {
+      transform: translateY(100%);
+    }
+  }
+
+  @keyframes sheet-fade {
+    from {
+      opacity: 0;
+    }
+  }
+
+  .sheet-head {
+    display: flex;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding: 0 4px 0 16px;
+  }
+
+  .page-body > .ant-layout-content.has-bar {
+    padding-bottom: calc(88px + env(safe-area-inset-bottom)) !important;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .sel-bar {
+    left: 208px;
+  }
+}
+
+@media (max-width: 767px) {
+  /* ---- shell ---------------------------------------------------------- */
+  .app-sider,
+  .app-toolbar {
+    display: none !important;
+  }
+
+  .app-main {
+    overflow-y: auto !important;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    min-width: 0;
+  }
+
+  .app-main > * {
+    flex-shrink: 0;
+  }
+
+  .app-main > .ant-layout-content {
+    flex: none !important;
+    overflow: visible !important;
+    padding: 16px 16px 64px !important;
+  }
+
+  .app-topbar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    height: calc(52px + env(safe-area-inset-top));
+    padding: env(safe-area-inset-top) max(8px, env(safe-area-inset-right)) 0 max(8px, env(safe-area-inset-left));
+  }
+
+  .app-topbar .ant-btn {
+    height: 44px;
+    min-width: 44px;
+  }
+
+  .topbar-brand {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    min-height: 44px;
+  }
+
+  .nav-drawer .ant-drawer-content-wrapper {
+    max-width: 86vw;
+  }
+
+  .queue-drawer .ant-drawer-content-wrapper {
+    width: 100vw !important;
+    max-width: 100vw;
+  }
+
+  .nav-drawer a,
+  .nav-drawer .ant-drawer-body > nav > a {
+    display: block;
+  }
+
+  .nav-drawer .ant-drawer-body {
+    overflow-y: auto;
+  }
+
+  .nav-btn {
+    height: 44px;
+  }
+
+  .nav-row {
+    min-height: 44px;
+  }
+
+  .ant-drawer-close,
+  .ant-modal-close {
+    width: 44px !important;
+    height: 44px !important;
+    display: grid !important;
+    place-items: center;
+  }
+
+  /* ---- controls ------------------------------------------------------- */
+  .ant-btn {
+    min-height: 44px;
+  }
+
+  .ant-btn.ant-btn-icon-only:not(.tile-act) {
+    width: 44px;
+    min-width: 44px;
+    flex-shrink: 0;
+  }
+
+  .app-main a:has(> .ant-btn) {
+    display: inline-block;
+  }
+
+  .ant-input,
+  .ant-input-affix-wrapper {
+    min-height: 44px;
+  }
+
+  .ant-input-affix-wrapper .ant-input {
+    min-height: 0;
+  }
+
+  .ant-input,
+  .ant-input-affix-wrapper input,
+  textarea.ant-input {
+    font-size: 16px !important;
+  }
+
+  /* Reading text; the letter-spaced micro labels keep their small size. */
+  .app-main .ant-typography:not(.tile *, [style*='letter-spacing']) {
+    font-size: 14px !important;
+  }
+
+  .ant-input-clear-icon {
+    display: inline-grid !important;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    margin-right: -12px;
+  }
+
+  .ant-checkbox-wrapper {
+    min-height: 44px;
+    align-items: center !important;
+  }
+
+  .ant-checkbox-wrapper .ant-checkbox-label {
+    align-self: center;
+  }
+
+  .ant-checkbox-wrapper .ant-checkbox {
+    align-self: center !important;
+    top: 0 !important;
+  }
+
+  .ant-segmented:not(.ant-segmented-sm) .ant-segmented-item-label {
+    min-height: 40px;
+    line-height: 40px;
+  }
+
+  .ant-pagination-prev,
+  .ant-pagination-next,
+  .ant-pagination-item,
+  .ant-pagination-item a,
+  .ant-pagination button {
+    min-width: 44px;
+    min-height: 44px;
+    line-height: 44px;
+  }
+
+  .side-panel .ant-tag {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .side-panel .ant-tag-close-icon {
+    min-width: 44px;
+    min-height: 44px;
+    display: inline-grid !important;
+    place-items: center;
+    margin: 0 -10px 0 0 !important;
+  }
+
+  .ant-typography-copy {
+    min-width: 44px;
+    min-height: 44px;
+    display: inline-grid !important;
+    place-items: center;
+  }
+
+  .ant-alert-close-icon {
+    min-width: 44px;
+    min-height: 44px;
+    display: inline-grid !important;
+    place-items: center;
+  }
+
+  .ant-alert-title,
+  .ant-alert-description {
+    overflow-wrap: anywhere;
+  }
+
+  .scroll-x {
+    overflow-x: auto;
+    max-width: 100%;
+  }
+
+  .scroll-x .ant-segmented {
+    width: max-content;
+  }
+
+  /* ---- home ----------------------------------------------------------- */
+  .ant-layout-content[style*='place-items'] {
+    place-items: start center !important;
+  }
+
+  /* ---- profile and direct links --------------------------------------- */
+  .profile-head {
+    flex-wrap: wrap !important;
+    padding: 12px 16px !important;
+    gap: 12px 16px !important;
+  }
+
+  .profile-head > .ant-flex {
+    min-width: 0;
+  }
+
+  .profile-stats {
+    gap: 16px !important;
+  }
+
+  .profile-stats .ant-typography {
+    white-space: nowrap;
+  }
+
+  .profile-actions {
+    flex: 1 0 100% !important;
+    flex-wrap: wrap;
+    gap: 8px !important;
+  }
+
+  .profile-actions .ant-btn {
+    flex: 1 1 auto;
+  }
+
+  .direct-head {
+    padding: 16px !important;
+  }
+
+  .kind-tabs {
+    gap: 0 !important;
+    justify-content: stretch !important;
+  }
+
+  .kind-tab {
+    flex: 1;
+    min-height: 44px;
+    display: grid;
+    place-items: center;
+    padding: 0 !important;
+    text-align: center;
+  }
+
+  .filter-bar {
+    gap: 8px !important;
+  }
+
+  .filter-bar .filter-query {
+    width: 100% !important;
+  }
+
+  .filter-bar .filter-gap,
+  .filter-bar .density {
+    display: none;
+  }
+
+  .filter-bar > .ant-btn {
+    flex: 1 1 140px;
+  }
+
+  .page-body {
+    overflow: visible !important;
+    flex: none !important;
+    min-height: auto !important;
+  }
+
+  .page-body > .ant-layout-content {
+    overflow: visible !important;
+    padding: 12px 12px 64px !important;
+  }
+
+  .media-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    grid-auto-rows: auto !important;
+    gap: 8px !important;
+  }
+
+  .media-grid .tile-wrap {
+    height: auto !important;
+  }
+
+  .tile-hero {
+    grid-column: auto !important;
+    grid-row: auto !important;
+  }
+
+  .direct-wait {
+    aspect-ratio: 1;
+    min-width: 0;
+  }
+
+  /* A tile is selected by tapping it, so the checkbox only repeats that;
+     the ring and this mark show the state. */
+  .tile-check {
+    display: none;
+  }
+
+  .tile[aria-pressed='true']::after {
+    content: '\2713';
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background: #e1306c;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+    pointer-events: none;
+  }
+
+  .tile-eng-ready {
+    left: 30px !important;
+  }
+
+  .side-panel [data-testid='base-filename'] {
+    margin-bottom: 8px;
+  }
+
+  .tile-pills {
+    left: 8px !important;
+    top: 8px !important;
+  }
+
+  .tile[aria-pressed='true'] ~ .tile-pills,
+  .tile-wrap:has(.tile[aria-pressed='true']) .tile-pills {
+    left: 36px !important;
+  }
+
+  .tile-act {
+    width: 44px !important;
+    height: 44px !important;
+    min-width: 44px;
+    padding: 6px !important;
+    background-clip: content-box !important;
+    top: 0 !important;
+  }
+
+  .tile-act-preview {
+    right: 0 !important;
+  }
+
+  .tile-act-recreate {
+    right: 44px !important;
+  }
+
+  .tile-act-copy {
+    right: 88px !important;
+  }
+
+  .tile-act-copy.no-recreate {
+    right: 44px !important;
+  }
+
+  .tile-retry {
+    width: 44px;
+    height: 44px;
+    margin: -10px -6px -10px 0;
+  }
+
+  /* ---- lightbox ------------------------------------------------------- */
+  .lightbox .ant-modal {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    margin: 0 !important;
+    top: 0 !important;
+    padding-bottom: 0 !important;
+  }
+
+  .lightbox .ant-modal-container,
+  .lightbox .ant-modal-content {
+    border-radius: 0;
+    min-height: 100dvh;
+  }
+
+  .lightbox .ant-modal-container .ant-modal-header {
+    padding-right: 56px !important;
+  }
+
+  .lightbox .ant-modal-close {
+    top: 4px !important;
+    inset-inline-end: 4px !important;
+  }
+
+  .lightbox-act {
+    min-width: 44px;
+  }
+
+  /* ---- activity: one card per row ------------------------------------- */
+  .activity-table .ant-table-thead {
+    display: none;
+  }
+
+  .activity-table table,
+  .activity-table tbody,
+  .activity-table tr,
+  .activity-table td {
+    display: block;
+    width: 100% !important;
+  }
+
+  .activity-table .ant-table-measure-row,
+  .activity-table colgroup {
+    display: none;
+  }
+
+  .activity-table tr.ant-table-row {
+    margin-bottom: 8px;
+    padding: 6px 12px;
+    border: 1px solid rgba(128, 128, 128, 0.3);
+    border-radius: 10px;
+  }
+
+  .activity-table td {
+    display: flex;
+    gap: 12px;
+    border: 0 !important;
+    padding: 4px 0 !important;
+    overflow-wrap: anywhere;
+  }
+
+  .activity-table td:has(> .ant-typography:empty) {
+    display: none;
+  }
+
+  .activity-table td[data-label]::before {
+    content: attr(data-label);
+    flex: 0 0 56px;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    opacity: 0.6;
+  }
+
+  /* ---- recreate ------------------------------------------------------- */
+  .recreate-list {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .recreate-card {
+    flex-direction: row !important;
+    align-items: stretch;
+  }
+
+  .recreate-card > a {
+    flex: 0 0 112px;
+    width: 112px;
+  }
+
+  .recreate-card > .ant-flex {
+    flex: 1;
+    min-width: 0;
+    justify-content: center;
+  }
+
+  .rc-cols {
+    flex-direction: column !important;
+    flex-wrap: nowrap !important;
+    align-items: stretch !important;
+  }
+
+  .rc-media {
+    width: 100% !important;
+  }
+
+  .rc-main {
+    min-width: 0 !important;
+    width: 100%;
+  }
+
+  /* ---- design preview: the page scrolls, the rails go ------------------- */
+  .pv-root {
+    height: auto !important;
+    min-height: 100dvh;
+    overflow: visible !important;
+  }
+
+  .pv-sider,
+  .pv-inspector {
+    display: none !important;
+  }
+
+  .pv-bar {
+    height: auto !important;
+    min-height: 56px;
+    padding-top: 8px !important;
+    padding-bottom: 8px !important;
+  }
+
+  .pv-body {
+    overflow: visible !important;
+    flex: none !important;
+  }
+
+  .pv-body > .ant-layout-content {
+    overflow: visible !important;
+  }
+
+  /* ---- trending ------------------------------------------------------- */
+  .trend-row {
+    min-height: 44px;
+  }
+
+  .trend-posts {
+    padding-left: 0 !important;
+  }
+}
+
+/* Tablet: the sider stays, so the profile header gives its actions a row
+   of their own rather than squeezing the stats. */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .profile-stats .ant-typography {
+    white-space: nowrap;
+  }
+
+  .profile-head {
+    flex-wrap: wrap;
+  }
+
+  .profile-actions {
+    flex: 1 0 100%;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .app-toolbar {
+    flex-wrap: wrap;
+  }
+}

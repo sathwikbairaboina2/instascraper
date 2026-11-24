@@ -20,12 +20,13 @@ import {
   Typography,
   theme,
 } from 'antd'
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 
 import AppShell from '@/components/AppShell'
 import Lightbox from '@/components/Lightbox'
 import MediaTile from '@/components/MediaTile'
 import SelectionBar from '@/components/SelectionBar'
+import SidePanel from '@/components/SidePanel'
 import {
   addDirectUrls,
   ensureMedia,
@@ -40,7 +41,7 @@ import { usePolling } from '@/lib/usePolling'
 import { useRecreateShared } from '@/components/RecreateProvider'
 import { useSelection } from '@/lib/useSelection'
 
-const { Content, Sider } = Layout
+const { Content } = Layout
 const { Text, Paragraph } = Typography
 
 const TABS = ['all', 'posts', 'reels', 'recreate'] as const
@@ -55,6 +56,9 @@ export default function DirectUrlsPage() {
   const [tab, setTab] = useState<Tab>('all')
   const [preview, setPreview] = useState<MediaSummary | null>(null)
   const [base, setBase] = useState('direct')
+  // Phones show the inspector as a sheet; see SidePanel.
+  const [sheet, setSheet] = useState(false)
+  const closeSheet = useCallback(() => setSheet(false), [])
 
   const { data, refresh } = usePolling(listDirectUrls, 4000)
   const recreate = useRecreateShared()
@@ -144,6 +148,7 @@ export default function DirectUrlsPage() {
       {/* The paste bar sits where a profile page puts its header: the input
           is the identity of this page the way the avatar is of that one. */}
       <div
+        className="direct-head"
         style={{
           flex: 'none',
           padding: '24px 32px 18px',
@@ -195,6 +200,7 @@ export default function DirectUrlsPage() {
 
       {/* Same underline-from-above tab bar as the profile page. */}
       <Flex
+        className="kind-tabs"
         justify="center"
         gap={44}
         data-testid="direct-tabs"
@@ -206,6 +212,7 @@ export default function DirectUrlsPage() {
             <div
               key={key}
               role="tab"
+              className="kind-tab"
               aria-selected={on}
               onClick={() => setTab(key)}
               style={{
@@ -226,6 +233,7 @@ export default function DirectUrlsPage() {
       </Flex>
 
       <Flex
+        className="filter-bar"
         align="center"
         gap={10}
         wrap
@@ -241,7 +249,7 @@ export default function DirectUrlsPage() {
           {counts.fetching > 0 && ` · ${counts.fetching} fetching`}
           {counts.failed > 0 && ` · ${counts.failed} failed`}
         </Text>
-        <div style={{ flex: 1 }} />
+        <div className="filter-gap" style={{ flex: 1 }} />
         <Text type="secondary" style={{ fontSize: 12 }}>
           {visible.length} of {indexed.length} shown
         </Text>
@@ -250,8 +258,11 @@ export default function DirectUrlsPage() {
         </Button>
       </Flex>
 
-      <Layout style={{ overflow: 'hidden', flex: 1, minHeight: 0 }}>
-        <Content style={{ overflowY: 'auto', padding: 16, background: token.colorBgLayout }}>
+      <Layout className="page-body" style={{ overflow: 'hidden', flex: 1, minHeight: 0 }}>
+        <Content
+          className={selectedItems.length > 0 ? 'has-bar' : undefined}
+          style={{ overflowY: 'auto', padding: 16, background: token.colorBgLayout }}
+        >
           {items.length === 0 ? (
             <Empty
               description="Nothing fetched yet — paste a link above"
@@ -260,6 +271,7 @@ export default function DirectUrlsPage() {
             />
           ) : (
             <div
+              className="media-grid"
               data-testid="media-grid"
               style={{
                 display: 'grid',
@@ -272,6 +284,7 @@ export default function DirectUrlsPage() {
                 waiting.map((item) => (
                   <div
                     key={item.shortcode}
+                    className="direct-wait"
                     data-testid={`direct-${item.status}-${item.shortcode}`}
                     style={{
                       borderRadius: token.borderRadiusLG,
@@ -344,13 +357,11 @@ export default function DirectUrlsPage() {
           )}
         </Content>
 
-        <Sider
-          width={300}
-          style={{
-            background: token.colorBgContainer,
-            borderLeft: `1px solid ${token.colorBorderSecondary}`,
-            overflowY: 'auto',
-          }}
+        <SidePanel
+          count={selectedItems.length}
+          open={sheet}
+          onOpen={() => setSheet(true)}
+          onClose={closeSheet}
         >
           {selectedItems.length === 0 && (
             <Flex vertical align="center" justify="center" gap={10} style={{ padding: 28, height: '100%' }}>
@@ -460,7 +471,7 @@ export default function DirectUrlsPage() {
               )}
             </div>
           )}
-        </Sider>
+        </SidePanel>
       </Layout>
 
       {previewLive && (

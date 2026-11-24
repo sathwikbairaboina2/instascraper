@@ -10,6 +10,8 @@ const frameAncestors = [
 ].join(' ')
 
 const nextConfig = {
+  // The dev badge would cover the bottom bars on a phone.
+  devIndicators: { appIsrStatus: false },
   async headers() {
     return [
       {

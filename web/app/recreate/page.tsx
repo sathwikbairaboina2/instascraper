@@ -100,13 +100,14 @@ export default function RecreatePage() {
             not columns: a tab reading zero is still a tab, where the same
             grouping laid out as columns is three empty ones until the
             generator exists. */}
-        <Segmented
-          data-testid="recreate-tabs"
-          value={tab}
-          onChange={(v) => setTab(v as Status)}
-          style={{ marginBottom: 14 }}
-          options={TABS.map((t) => ({ value: t.key, label: `${t.label} ${counts[t.key]}` }))}
-        />
+        <div className="scroll-x" style={{ marginBottom: 14 }}>
+          <Segmented
+            data-testid="recreate-tabs"
+            value={tab}
+            onChange={(v) => setTab(v as Status)}
+            options={TABS.map((t) => ({ value: t.key, label: `${t.label} ${counts[t.key]}` }))}
+          />
+        </div>
 
         {shown.length === 0 ? (
           <Empty
@@ -120,6 +121,7 @@ export default function RecreatePage() {
           />
         ) : (
           <div
+            className="recreate-list"
             data-testid="recreate-list"
             style={{
               display: 'grid',
@@ -130,6 +132,7 @@ export default function RecreatePage() {
             {shown.map((item) => (
               <Flex
                 key={item.shortcode}
+                className="recreate-card"
                 vertical
                 data-testid={`recreate-row-${item.shortcode}`}
                 style={{

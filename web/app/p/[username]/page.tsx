@@ -41,6 +41,7 @@ import ProfileHeader from '@/components/ProfileHeader'
 import Lightbox from '@/components/Lightbox'
 import MediaTile from '@/components/MediaTile'
 import SelectionBar from '@/components/SelectionBar'
+import SidePanel from '@/components/SidePanel'
 import {
   ApiError,
   clearCache,
@@ -71,7 +72,7 @@ import { usePolling } from '@/lib/usePolling'
 import { useRecreateShared } from '@/components/RecreateProvider'
 import { useSelection } from '@/lib/useSelection'
 
-const { Content, Sider } = Layout
+const { Content } = Layout
 const { Text, Paragraph } = Typography
 
 const PAGE = 120
@@ -91,6 +92,9 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
   const [base, setBase] = useState(username)
   const [saved, setSaved] = useState<SavedSelection[]>([])
   const [saveName, setSaveName] = useState('')
+  // Phones show the inspector as a sheet; see SidePanel.
+  const [sheet, setSheet] = useState(false)
+  const closeSheet = useCallback(() => setSheet(false), [])
 
   const { data: profile, error, cause, refresh: refreshProfile } = usePolling(
     () => getProfile(username),
@@ -310,6 +314,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
       {/* Instagram's centred bar with the active item underlined from above.
           A Segmented chip read as one more filter; this reads as a section. */}
       <Flex
+        className="kind-tabs"
         justify="center"
         gap={44}
         data-testid="profile-tabs"
@@ -324,6 +329,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
             <div
               key={kind}
               role="tab"
+              className="kind-tab"
               aria-selected={on}
               onClick={() => {
                 tabPicked.current = true
@@ -347,6 +353,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
       </Flex>
 
       <Flex
+        className="filter-bar"
         align="center"
         gap={10}
         wrap
@@ -364,6 +371,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
           value={filters.query}
           onChange={(e) => set('query', e.target.value)}
           prefix={<SearchOutlined style={{ color: token.colorTextQuaternary }} />}
+          className="filter-query"
           style={{ width: 200 }}
           allowClear
         />
@@ -374,7 +382,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
         >
           Cached only
         </Checkbox>
-        <div style={{ flex: 1 }} />
+        <div className="filter-gap" style={{ flex: 1 }} />
         <Text type="secondary" style={{ fontSize: 12 }} data-testid="filter-count">
           {visible.length} of {inTab.length} shown
         </Text>
@@ -384,6 +392,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
           </Button>
         )}
         <Segmented
+          className="density"
           size="small"
           value={density}
           onChange={(v) => setDensity(v as string)}
@@ -400,8 +409,11 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
         </Button>
       </Flex>
 
-      <Layout style={{ overflow: 'hidden', flex: 1, minHeight: 0 }}>
-        <Content style={{ overflowY: 'auto', padding: 16, background: token.colorBgLayout }}>
+      <Layout className="page-body" style={{ overflow: 'hidden', flex: 1, minHeight: 0 }}>
+        <Content
+          className={selectedItems.length > 0 || saved.length > 0 ? 'has-bar' : undefined}
+          style={{ overflowY: 'auto', padding: 16, background: token.colorBgLayout }}
+        >
           {!media ? (
             <div style={{ display: 'grid', gap: 10, gridTemplateColumns: `repeat(auto-fill, minmax(${tile}px, 1fr))` }}>
               {Array.from({ length: 12 }).map((_, i) => (
@@ -418,6 +430,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
             </Empty>
           ) : (
             <div
+              className="media-grid"
               data-testid="media-grid"
               style={{
                 display: 'grid',
@@ -427,7 +440,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
               }}
             >
               {visible.map((item, idx) => (
-                <div key={item.shortcode} style={idx === 0 ? { gridColumn: 'span 2', gridRow: 'span 2' } : undefined}>
+                <div key={item.shortcode} className={idx === 0 ? 'tile-cell tile-hero' : 'tile-cell'} style={idx === 0 ? { gridColumn: 'span 2', gridRow: 'span 2' } : undefined}>
                   <MediaTile
                     item={item}
                     marked={recreate.marked.has(item.shortcode)}
@@ -451,13 +464,12 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
           )}
         </Content>
 
-        <Sider
-          width={300}
-          style={{
-            background: token.colorBgContainer,
-            borderLeft: `1px solid ${token.colorBorderSecondary}`,
-            overflowY: 'auto',
-          }}
+        <SidePanel
+          count={selectedItems.length}
+          label={saved.length > 0 ? 'Saved selections' : undefined}
+          open={sheet}
+          onOpen={() => setSheet(true)}
+          onClose={closeSheet}
         >
           {selectedItems.length === 0 && (
             <Flex vertical align="center" justify="center" gap={10} style={{ padding: 28, height: '100%' }}>
@@ -605,7 +617,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
             )}
             </div>
           )}
-        </Sider>
+        </SidePanel>
       </Layout>
 
       {previewLive && (
