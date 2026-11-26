@@ -25,10 +25,16 @@ export const IG: { dark: Tokens; light: Tokens } = {
     surface: '#fafafa',
     hairline: '#dbdbdb',
     text: '#000000',
-    textSecondary: '#737373',
+    textSecondary: '#5e5e5e',
     action: '#e1306c',
-    destructive: '#ed4956',
+    destructive: '#c9303e',
   },
+}
+
+/** antd derives its layout ground (a #f5f5f5-ish grey) and container colour from the base colour, which leaves the
+ *  content area a grey off the shared ground. Pinning them keeps the ground at `ground` and surfaces at `surface`. */
+export function layoutTokens(t: Tokens) {
+  return { colorBgLayout: t.ground, colorBgContainer: t.surface }
 }
 
 /** The story ring: a cone, so the sweep reads as a ring rather than a wipe. */
@@ -50,13 +56,13 @@ export type ThemePref = { dark: boolean }
 export function loadPref(): ThemePref {
   try {
     const raw = localStorage.getItem(KEY)
-    if (!raw) return { dark: true }
+    if (!raw) return { dark: false }
     // The key used to hold {name, dark}. Reading only `dark` back means an
     // existing user keeps their light/dark choice and loses a theme name
-    // that no longer refers to anything.
-    return { dark: JSON.parse(raw)?.dark !== false }
+    // that no longer refers to anything. Nothing stored means light.
+    return { dark: JSON.parse(raw)?.dark === true }
   } catch {
-    return { dark: true }
+    return { dark: false }
   }
 }
 

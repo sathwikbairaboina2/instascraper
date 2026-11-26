@@ -51,3 +51,24 @@ a { color: inherit; text-decoration: none; }
 .ant-segmented:not(.ant-segmented-disabled) .ant-segmented-item-selected .ant-segmented-item-label {
   color: #fff;
 }
+
+/* The Graph / Fake readout is disabled while Graph is the only source, and
+ * antd's disabled text and track are too faint to read. Muted text on the fill
+ * token is about 6:1 in light and 7:1 in dark. */
+.adapter-switch.ant-segmented-disabled {
+  background: var(--ant-color-fill-secondary);
+}
+
+.adapter-switch.ant-segmented-disabled .ant-segmented-item,
+.adapter-switch.ant-segmented-disabled .ant-segmented-item-label {
+  color: var(--ant-color-text-secondary);
+}
+
+.adapter-switch.ant-segmented-disabled .ant-segmented-item-selected {
+  background: var(--ant-color-bg-container);
+  color: var(--ant-color-text);
+}
+
+.adapter-switch.ant-segmented-disabled .ant-segmented-item-selected .ant-segmented-item-label {
+  color: var(--ant-color-text);
+}

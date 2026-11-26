@@ -276,6 +276,7 @@ export default function AppShell({
   const adapterSwitch = (
     <Segmented
       size="small"
+      className="adapter-switch"
       // Switching is off for now: Graph is the only source in use. The
       // control stays visible because naming the live dataset is the
       // half that still earns its place. Re-enable by dropping
