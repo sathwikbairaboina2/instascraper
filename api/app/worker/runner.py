@@ -16,6 +16,10 @@ from app.worker.resync import resync_tick
 log = logging.getLogger("worker")
 
 
+def _resync_on(settings: Settings) -> bool:
+    return bool(settings.resync_daily_at) or settings.resync_interval_hours > 0
+
+
 @dataclass
 class HandlerContext:
     conn: object
@@ -93,16 +97,16 @@ class Worker(threading.Thread):
 
     # ---- scheduled resync ----------------------------------------------
     def _until_resync(self, settings: Settings) -> float:
-        if settings.resync_interval_hours <= 0 or self._next_resync is None:
+        if not _resync_on(settings) or self._next_resync is None:
             return IDLE_TIMEOUT
         return max(0.01, self._next_resync - time.monotonic())
 
     def _maybe_resync(self, conn, settings: Settings) -> None:
-        """Queue one overdue tracked profile at most every resync_check_seconds.
+        """Queue overdue tracked profiles at most every resync_check_seconds.
 
         Reads the live settings each pass, so it follows the adapter toggle.
         """
-        if settings.resync_interval_hours <= 0:
+        if not _resync_on(settings):
             self._next_resync = None
             return
         now = time.monotonic()

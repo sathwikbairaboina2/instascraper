@@ -161,3 +161,22 @@ def test_status_resync_next_due_is_null_when_disabled(client, conn):
     body = client.get("/api/status").json()["resync"]
     assert body["interval_hours"] == 0.0
     assert body["next_due"] is None
+
+
+def test_status_resync_daily_mode_shows_slot_and_zone(client, conn):
+    from dataclasses import replace
+
+    conn.execute("INSERT INTO profiles (username, tracked, created_at) VALUES ('a', 1, 'x')")
+    holder = client.app_state.runtime
+    holder.swap(
+        type(holder.current)(
+            holder.current.name,
+            replace(holder.current.settings, resync_daily_at="06:00", resync_tz="Asia/Kolkata"),
+            holder.current.adapter,
+        )
+    )
+    body = client.get("/api/status").json()["resync"]
+    assert body["mode"] == "daily"
+    assert body["daily_at"] == "06:00" and body["tz"] == "Asia/Kolkata"
+    assert body["next_due"]["username"] == "a"
+    assert body["slot_next"]

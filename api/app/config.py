@@ -31,6 +31,11 @@ class Settings:
     # looks at most every check_seconds and queues one profile per look.
     resync_interval_hours: float = 24.0
     resync_check_seconds: float = 300.0
+    # One daily window instead of the interval: from resync_daily_at (HH:MM in
+    # resync_tz) every tracked profile not synced since that slot is queued.
+    # Empty turns it off and the interval mode above applies.
+    resync_daily_at: str = "06:00"
+    resync_tz: str = "Asia/Kolkata"
 
 
 def load_settings() -> Settings:
@@ -70,4 +75,6 @@ def load_settings() -> Settings:
         sqs_queue=os.environ.get("SQS_QUEUE", "recreate-jobs"),
         resync_interval_hours=float(os.environ.get("RESYNC_INTERVAL_HOURS", "24")),
         resync_check_seconds=float(os.environ.get("RESYNC_CHECK_SECONDS", "300")),
+        resync_daily_at=os.environ.get("RESYNC_DAILY_AT", "06:00").strip(),
+        resync_tz=os.environ.get("RESYNC_TZ", "Asia/Kolkata").strip() or "Asia/Kolkata",
     )

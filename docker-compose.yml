@@ -12,6 +12,8 @@ services:
       SQS_QUEUE: recreate-jobs
       RESYNC_INTERVAL_HOURS: ${RESYNC_INTERVAL_HOURS:-24}
       RESYNC_CHECK_SECONDS: ${RESYNC_CHECK_SECONDS:-300}
+      RESYNC_DAILY_AT: ${RESYNC_DAILY_AT-06:00}
+      RESYNC_TZ: ${RESYNC_TZ:-Asia/Kolkata}
     volumes:
       - ./data:/data
       - ${OUT_DIR:-./downloads}:/out

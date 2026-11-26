@@ -30,6 +30,8 @@ def settings(tmp_path: Path) -> Settings:
         reel_max_per_day=100,
         reel_timeout=5.0,
         reel_min_interval=0.0,
+        # The older resync tests exercise interval mode; daily tests opt in.
+        resync_daily_at="",
     )
 
 
